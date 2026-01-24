@@ -1,0 +1,31 @@
+# Xcode
+#
+# gitignore contributors: use some built in aliases to keep with the theme
+# https://github.com/github/gitignore/blob/main/Swift.gitignore
+
+## Build results
+build/
+DerivedData/
+
+## Dependency directories
+## CocoaPods
+Pods/
+Frameworks/
+
+## Swift Package Manager
+.build/
+.swiftpm/
+
+## User-specific files
+*.hmap
+*.ipa
+*.playground.xml
+*.xcuserdata
+
+## Misc
+.DS_Store
+*.swp
+*~.nib
+
+## Root-level user settings
+DateApp.xcodeproj/xcuserdata/

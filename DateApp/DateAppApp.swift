@@ -1,32 +1,22 @@
-//
-//  DateAppApp.swift
-//  DateApp
-//
-//  Created by Emre Yılmaz on 29.12.2025.
-//
-
 import SwiftUI
 import SwiftData
 
 @main
 struct DateAppApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @StateObject private var session = SessionStore()
+    private let container: ModelContainer = AppModelContainer.make(inMemory: false)
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .modelContainer(container)
+                .environmentObject(session)
+                .onAppear {
+                    // ✅ App Init Seeding
+                    DemoSeeder.seedIfNeeded(context: container.mainContext)
+                }
+                .preferredColorScheme(.dark) // ✅ Enforce Makromusic Dark Theme
         }
-        .modelContainer(sharedModelContainer)
     }
 }

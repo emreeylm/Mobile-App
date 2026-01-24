@@ -11,9 +11,39 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		C30A85A62F0295C000B814BC /* Data */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Data;
+			sourceTree = "<group>";
+		};
 		C3F3D4932F02761500F9A3CD /* DateApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = DateApp;
+			sourceTree = "<group>";
+		};
+		C3F3D4A22F0277C300F9A3CD /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		C3F3D4A42F0277D700F9A3CD /* Session */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Session;
+			sourceTree = "<group>";
+		};
+		C3F3D4A52F0277E100F9A3CD /* Seed */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Seed;
+			sourceTree = "<group>";
+		};
+		C3F3D4A92F02780F00F9A3CD /* UI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = UI;
+			sourceTree = "<group>";
+		};
+		C3F3D4BA2F0278A500F9A3CD /* Utils */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Utils;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +62,12 @@
 		C3F3D4882F02761500F9A3CD = {
 			isa = PBXGroup;
 			children = (
+				C30A85A62F0295C000B814BC /* Data */,
+				C3F3D4BA2F0278A500F9A3CD /* Utils */,
+				C3F3D4A92F02780F00F9A3CD /* UI */,
+				C3F3D4A52F0277E100F9A3CD /* Seed */,
+				C3F3D4A42F0277D700F9A3CD /* Session */,
+				C3F3D4A22F0277C300F9A3CD /* Models */,
 				C3F3D4932F02761500F9A3CD /* DateApp */,
 				C3F3D4922F02761500F9A3CD /* Products */,
 			);
@@ -61,7 +97,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				C30A85A62F0295C000B814BC /* Data */,
 				C3F3D4932F02761500F9A3CD /* DateApp */,
+				C3F3D4A22F0277C300F9A3CD /* Models */,
+				C3F3D4A42F0277D700F9A3CD /* Session */,
+				C3F3D4A52F0277E100F9A3CD /* Seed */,
+				C3F3D4A92F02780F00F9A3CD /* UI */,
+				C3F3D4BA2F0278A500F9A3CD /* Utils */,
 			);
 			name = DateApp;
 			packageProductDependencies = (
