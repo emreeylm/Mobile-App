@@ -19,10 +19,15 @@ struct RecommendationsView: View {
     @State private var deck: [Profile] = []
     @State private var isReady = false
     @State private var dragProgress: CGFloat = 0
+    
+    // Recovery / Action States
+    @State private var lastSwipedProfile: Profile? = nil
+    @State private var isRewinding = false
 
     var body: some View {
         VStack(spacing: 0) { // ✅ No vertical spacing
-
+            // Üstteki Geri Al butonu kaldırıldı, karta taşındı
+            Color.clear.frame(height: 0)
 
 
 
@@ -33,7 +38,7 @@ struct RecommendationsView: View {
                 // Available dynamic space
                 let availableW = w.safeNonNegative // ✅ Full width, no side gaps
                 let topInset: CGFloat = 0 // ✅ Start card immediately
-                let bottomInset: CGFloat = 130 // ✅ Lifted to shift card higher
+                let bottomInset: CGFloat = 80 // ✅ Hafifçe küçültüldü (Daha dengeli görünüm)
                 let availableH = (h - topInset - bottomInset).safeNonNegative
                 
                 // 9:16 Logic
@@ -59,37 +64,55 @@ struct RecommendationsView: View {
                                 .frame(width: cardW, height: cardH)
                                 .padding(.top, topInset)
                         } else {
-                            if deck.count >= 2 {
-                                RecommendationCard(profile: deck[1])
+                            // Stable ID-based rendering for top 2 cards to prevent flickering
+                            let visibleCards = Array(deck.prefix(2))
+                            
+                            ForEach(visibleCards.reversed(), id: \.id) { profile in
+                                let isTop = profile.id == deck.first?.id
+                                
+                                if isTop {
+                                    SwipeableRecommendationCard(
+                                        profile: profile,
+                                        width: cardW,
+                                        height: cardH,
+                                        onDrag: { progress in
+                                            dragProgress = progress
+                                        },
+                                        onSuperlike: {
+                                            superlikeAction()
+                                        },
+                                        onRewind: {
+                                            rewind()
+                                        },
+                                        isRewindEnabled: lastSwipedProfile != nil,
+                                        onSwipe: { liked in
+                                            handleSwipe(liked: liked)
+                                        }
+                                    )
                                     .frame(width: cardW, height: cardH)
-                                    .scaleEffect(0.96 + (0.04 * dragProgress)) // ✅ Parallax scale
-                                    .opacity(0.85 + (0.15 * dragProgress)) // ✅ Parallax opacity
-                                    .offset(y: 8 - (8 * dragProgress)) // ✅ Parallax offset
-                                    .allowsHitTesting(false)
-                                    .padding(.top, topInset) // ✅ Push down
-                                    .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.8), value: dragProgress)
-                            }
-
-                            SwipeableRecommendationCard(
-                                profile: deck[0],
-                                width: cardW,
-                                height: cardH,
-                                onDrag: { progress in
-                                    dragProgress = progress
+                                    .padding(.top, topInset)
+                                    .zIndex(1) // Always on top
+                                    .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.9), value: deck.first?.id)
+                                    .drawingGroup()
+                                } else {
+                                    RecommendationCard(profile: profile)
+                                        .frame(width: cardW, height: cardH)
+                                        .scaleEffect(0.96 + (0.04 * dragProgress))
+                                        .opacity(0.85 + (0.15 * dragProgress))
+                                        .offset(y: 8 - (8 * dragProgress))
+                                        .allowsHitTesting(false)
+                                        .padding(.top, topInset)
+                                        .zIndex(0) // Background card
+                                        .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.8), value: dragProgress)
                                 }
-                            ) { liked in
-                                handleSwipe(liked: liked)
                             }
-                            .frame(width: cardW, height: cardH)
-                            .padding(.top, topInset) // ✅ Push down
-                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: deck.first?.id)
                         }
                     }
                 }
                 .frame(width: w, height: h)
-                .offset(y: -40) // ✅ Shift whole stack up without resizing
+                .offset(y: -40) // ✅ Kartlar biraz daha yukarı alındı
+                .animation(.none, value: dragProgress) // ✅ Drag sırasında ana ZStack animasyonunu engelle
             }
-            .padding(.bottom, 0) // ✅ Removed extra bottom gap
         }
         .onAppear { buildDeck(force: true) }
         .onChange(of: profiles.count) { _, _ in
@@ -159,11 +182,95 @@ struct RecommendationsView: View {
 
     private func handleSwipe(liked: Bool) {
         guard deck.isEmpty == false else { return }
+        
+        // Save for rewind
+        lastSwipedProfile = deck.first
 
         // ✅ withAnimation “unused” uyarısı: sonucu kullanmıyoruz, zaten statement olarak yeterli
         withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
             deck.removeFirst()
             dragProgress = 0
+        }
+    }
+    
+    // MARK: - Action Methods
+    
+    private func rewind() {
+        guard let last = lastSwipedProfile, !isRewinding else { return }
+        
+        isRewinding = true
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+            deck.insert(last, at: 0)
+            lastSwipedProfile = nil
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isRewinding = false
+        }
+    }
+    
+    private func superlikeAction() {
+        guard !deck.isEmpty else { return }
+        // For visual feedback, we could use a special animation here
+        // For now, it's a "super" version of a like
+        handleSwipe(liked: true)
+    }
+    
+    // MARK: - Component Views
+    
+    private func actionButtonsGroup(cardW: CGFloat) -> some View {
+        ZStack {
+            // Geri (Rewind) - Sol Alt
+            HStack {
+                actionButton(
+                    icon: "arrow.uturn.backward",
+                    size: 52,
+                    isFilled: false,
+                    strokeColor: AppTheme.text.opacity(0.3)
+                ) {
+                    rewind()
+                }
+                .disabled(lastSwipedProfile == nil)
+                .opacity(lastSwipedProfile == nil ? 0.2 : 1.0)
+                .padding(.leading, 24) // Sol butonun yeri sabit
+                
+                Spacer()
+            }
+            
+            // Superlike kaldırıldı, artık kartın içinde
+            HStack {
+                Spacer()
+            }
+        }
+        .frame(width: cardW)
+    }
+    
+    private func actionButton(
+        icon: String,
+        size: CGFloat,
+        isFilled: Bool,
+        fillColor: Color = .clear,
+        strokeColor: Color = .clear,
+        iconColor: Color = AppTheme.text.opacity(0.7),
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            ZStack {
+                if isFilled {
+                    Circle()
+                        .fill(fillColor)
+                        .frame(width: size, height: size)
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                } else {
+                    Circle()
+                        .stroke(strokeColor, lineWidth: 1.5)
+                        .frame(width: size, height: size)
+                }
+                
+                Image(systemName: icon)
+                    .font(.system(size: size * 0.38, weight: .semibold))
+                    .foregroundStyle(iconColor)
+            }
         }
     }
 }
@@ -176,6 +283,9 @@ private struct SwipeableRecommendationCard: View {
     let width: CGFloat
     let height: CGFloat
     let onDrag: (CGFloat) -> Void
+    let onSuperlike: () -> Void
+    let onRewind: () -> Void
+    let isRewindEnabled: Bool
     let onSwipe: (Bool) -> Void
 
     @State private var offset: CGSize = .zero
@@ -187,7 +297,12 @@ private struct SwipeableRecommendationCard: View {
 
     var body: some View {
         ZStack {
-            RecommendationCard(profile: profile)
+            RecommendationCard(
+                profile: profile,
+                onSuperlike: onSuperlike,
+                onRewind: onRewind,
+                isRewindEnabled: isRewindEnabled
+            )
 
             HStack {
                 if offset.width > 10 {
@@ -208,19 +323,19 @@ private struct SwipeableRecommendationCard: View {
         .offset(x: offset.width, y: offset.height)
         .rotationEffect(.degrees(Double(rotation)))
         .scaleEffect(scale)
+        .drawingGroup() // ✅ GPU acceleration for smooth dragging
         .gesture(
             DragGesture()
                 .onChanged { value in
                     guard isLeaving == false else { return }
-                    withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.7)) {
-                        offset = value.translation
-                        rotation = (offset.width / 15).clamped(-14, 14)
-                        
-                        // Subtle scaling while dragging
-                        let progress = min(abs(offset.width) / threshold, 1.0)
-                        scale = 1.0 - (progress * 0.05)
-                        onDrag(progress)
-                    }
+                    // ✅ Removed withAnimation for instant feedback during drag
+                    offset = value.translation
+                    rotation = (offset.width / 15).clamped(-14, 14)
+                    
+                    // Subtle scaling while dragging
+                    let progress = min(abs(offset.width) / threshold, 1.0)
+                    scale = 1.0 - (progress * 0.05)
+                    onDrag(progress)
                 }
                 .onEnded { _ in
                     guard isLeaving == false else { return }
@@ -230,7 +345,7 @@ private struct SwipeableRecommendationCard: View {
                     } else if offset.width < -threshold {
                         leave(liked: false)
                     } else {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             offset = .zero
                             rotation = 0
                             scale = 1.0
@@ -252,7 +367,7 @@ private struct SwipeableRecommendationCard: View {
 
         onDrag(1.0) // Ensure background card completes transition
 
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             offset = CGSize(width: direction * (width + 300), height: 80 * direction)
             rotation = direction * 25
             scale = 0.8 // Shrink slightly as it leaves
@@ -294,13 +409,18 @@ private struct SwipeableRecommendationCard: View {
 private struct RecommendationCard: View {
 
     let profile: Profile
+    var onSuperlike: (() -> Void)? = nil
+    var onRewind: (() -> Void)? = nil
+    var isRewindEnabled: Bool = false
+    
     @EnvironmentObject var session: SessionStore
+    
+    // ✅ Performance: Cache these values instead of calculating every frame
+    @State private var matchScore: Int = 0
+    @State private var matchSummary: String = ""
 
     var body: some View {
-        let matchScore = calculateScore()
-        let summary = calculateSummary()
-        
-        return ZStack {
+        ZStack {
             // 1. Card Container Background (Fixed/Solid Frame)
             AppTheme.surface
                 .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
@@ -318,6 +438,44 @@ private struct RecommendationCard: View {
                     imageArea
                         .frame(width: geo.size.width, height: geo.size.height)
                         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .overlay(alignment: .bottom) {
+                            HStack {
+                                // Rewind Button (Left)
+                                if isRewindEnabled, let onRewind = onRewind {
+                                    Button(action: onRewind) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(AppTheme.surface.opacity(0.9))
+                                                .frame(width: 44, height: 44)
+                                                .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
+                                            
+                                            Image(systemName: "arrow.uturn.backward")
+                                                .font(.system(size: 18, weight: .bold))
+                                                .foregroundStyle(AppTheme.text.opacity(0.8))
+                                        }
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                // Superlike Button (Right)
+                                if let onSuperlike = onSuperlike {
+                                    Button(action: onSuperlike) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(AppTheme.surface.opacity(0.9))
+                                                .frame(width: 44, height: 44)
+                                                .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
+                                            
+                                            Image(systemName: "star.fill")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(AppTheme.accent)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(12)
+                        }
                 }
                 .padding(4) // ✅ Further reduced inner image padding
                 .frame(maxHeight: .infinity) // Image takes mostly all space
@@ -336,7 +494,7 @@ private struct RecommendationCard: View {
                         Spacer()
                     }
                     
-                    Text(summary)
+                    Text(matchSummary)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(AppTheme.text.opacity(0.8))
                     
@@ -373,6 +531,11 @@ private struct RecommendationCard: View {
                 Spacer()
             }
             .padding(20)
+        }
+        .onAppear {
+            // ✅ Only calculate once when the card appears
+            matchScore = MatchingService.calculateMatchScore(user: session.currentProfile ?? profile, candidate: profile)
+            matchSummary = MatchingService.getCommonSummary(user: session.currentProfile ?? profile, candidate: profile)
         }
     }
     

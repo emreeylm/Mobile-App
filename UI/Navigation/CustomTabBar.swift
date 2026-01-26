@@ -2,8 +2,8 @@ import SwiftUI
 
 enum TabItem: String, CaseIterable {
     case discover = "sparkles"
-    case match = "heart.fill"
     case likes = "hand.thumbsup.fill"
+    case match = "heart.fill"
     case messages = "message.fill"
     case profile = "person.crop.circle.fill"
     

@@ -20,17 +20,17 @@ struct MainTabView: View {
                 }
                 .tag(TabItem.discover)
                 
-                // Eşleşme
-                NavigationStack {
-                    MatchesView()
-                }
-                .tag(TabItem.match)
-                
                 // Beğeniler
                 NavigationStack {
                     LikesView()
                 }
                 .tag(TabItem.likes)
+                
+                // Eşleşme
+                NavigationStack {
+                    MatchesView()
+                }
+                .tag(TabItem.match)
                 
                 // Mesajlar
                 NavigationStack {
