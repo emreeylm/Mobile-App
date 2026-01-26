@@ -14,6 +14,7 @@ private extension CGFloat {
 struct RecommendationsView: View {
 
     @EnvironmentObject var session: SessionStore
+    @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [Profile]
 
     @State private var deck: [Profile] = []
@@ -180,13 +181,16 @@ struct RecommendationsView: View {
         deck = sorted
     }
 
-    private func handleSwipe(liked: Bool) {
-        guard deck.isEmpty == false else { return }
+    private func handleSwipe(liked: Bool, isSuperLike: Bool = false) {
+        guard let me = session.currentProfile, let target = deck.first else { return }
         
         // Save for rewind
-        lastSwipedProfile = deck.first
+        lastSwipedProfile = target
 
-        // ✅ withAnimation “unused” uyarısı: sonucu kullanmıyoruz, zaten statement olarak yeterli
+        // Persist the like
+        let edge = LikeEdge(fromProfileId: me.id, toProfileId: target.id, isLike: liked, isSuperLike: isSuperLike)
+        modelContext.insert(edge)
+
         withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
             deck.removeFirst()
             dragProgress = 0
@@ -211,9 +215,7 @@ struct RecommendationsView: View {
     
     private func superlikeAction() {
         guard !deck.isEmpty else { return }
-        // For visual feedback, we could use a special animation here
-        // For now, it's a "super" version of a like
-        handleSwipe(liked: true)
+        handleSwipe(liked: true, isSuperLike: true)
     }
     
     // MARK: - Component Views
@@ -482,17 +484,22 @@ private struct RecommendationCard: View {
                 
                 // Info Section (Bottom of Container)
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(profile.name)
-                            .modernFont(.title, weight: .heavy)
-                            .foregroundStyle(AppTheme.text)
-                        
-                        Text("\(profile.age)")
-                            .modernFont(.title3, weight: .semibold)
-                            .foregroundStyle(AppTheme.text.opacity(0.6))
-                        
-                        Spacer()
+                    NavigationLink {
+                        ProfilePreviewView(profile: profile)
+                    } label: {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(profile.name)
+                                .modernFont(.title, weight: .heavy)
+                                .foregroundStyle(AppTheme.text)
+                            
+                            Text("\(profile.age)")
+                                .modernFont(.title3, weight: .semibold)
+                                .foregroundStyle(AppTheme.text.opacity(0.6))
+                            
+                            Spacer()
+                        }
                     }
+                    .buttonStyle(.plain)
                     
                     Text(matchSummary)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))

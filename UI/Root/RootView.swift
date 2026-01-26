@@ -13,10 +13,14 @@ struct RootView: View {
                 AuthLandingView()
             } else {
                 if session.currentProfile == nil {
-                    // Kayıt olduktan sonra ProfileSetup’a gitmek yerine,
-                    // artık kayıt akışı profili zaten oluşturuyor.
-                    // Yine de güvenli fallback:
-                    ProfileSetupView()
+                    VStack(spacing: 20) {
+                        Text("Profil bulunamadı.")
+                            .foregroundStyle(.secondary)
+                        Button("Çıkış Yap") { 
+                            session.signOut() 
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 } else {
                     MainTabView()
                 }

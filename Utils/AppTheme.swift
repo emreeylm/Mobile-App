@@ -5,15 +5,16 @@ import SwiftData
 
 struct AppTheme {
     
-    // Updated Palette: Slate Dark theme
-    static let main = Color(hex: "0F172A")
-    static let accent = creamAccent // Cream is now the primary accent
-    static let creamAccent = Color(hex: "FDEBD0") 
+    // Updated Palette: Exact requested colors
+    static let main = Color(hex: "0F172A") // Deep Slate Blue
+    static let accent = Color(hex: "F5E6C8") // Cream Accent
+    static let creamAccent = Color(hex: "F5E6C8") 
+    static let makroTeal = Color(hex: "52C4C4") 
     static let secondarySlate = Color(hex: "1E293B")
-    static let text = Color(hex: "E5E7EB")
+    static let text = Color(hex: "F1F5F9") // Light gray for text visibility on dark bg
     
     static let primaryGradient = LinearGradient(
-        colors: [Color(hex: "1e293b"), Color(hex: "0f172a")],
+        colors: [main, main], // Solid background as requested
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
@@ -65,6 +66,27 @@ extension Color {
 }
 
 // MARK: - Modifiers
+
+struct ModernSetupButtonStyle: ButtonStyle {
+    var isDisabled: Bool = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 18, weight: .bold, design: .rounded))
+            .foregroundColor(Color.black.opacity(0.8))
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .background(isDisabled ? AppTheme.accent.opacity(0.3) : AppTheme.accent)
+            .clipShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.interactiveSpring(), value: configuration.isPressed)
+    }
+}
+
+extension View {
+    func setupButtonStyle(disabled: Bool = false) -> some View {
+        self.buttonStyle(ModernSetupButtonStyle(isDisabled: disabled))
+    }
+}
 
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

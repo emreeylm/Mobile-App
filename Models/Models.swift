@@ -40,10 +40,13 @@ final class Profile {
     var avatarSymbol: String
     var favoriteMovieGenres: [String]
     
-    // New fields for the redesigned profile
-    var height: String = "175 cm"
-    var zodiac: String = "Aslan"
-    var smokingHabit: String = "İçmiyor"
+    // New fields
+    var birthday: Date?
+    var height: String = "170 cm"
+    var smokingHabit: String = "Söylemek istemiyorum"
+    var alcoholHabit: String = "Söylemek istemiyorum"
+    var university: String = ""
+    var interests: [String] = []
 
     @Relationship(deleteRule: .cascade) var photos: [ProfilePhoto] = []
     
@@ -55,23 +58,26 @@ final class Profile {
         ownerUserId: String,
         firstName: String,
         lastName: String,
-        age: Int,
-        city: String,
-        jobTitle: String,
+        age: Int = 18,
+        city: String = "",
+        jobTitle: String = "Belirtilmedi",
         bio: String,
         gender: Gender = .other,
         lookingForGender: LookingForGender = .everyone,
         avatarSymbol: String = "person.fill",
         favoriteMovieGenres: [String] = [],
-        height: String = "175 cm",
-        zodiac: String = "Aslan",
-        smokingHabit: String = "İçmiyor"
+        birthday: Date? = nil,
+        height: String = "170 cm",
+        smokingHabit: String = "Söylemek istemiyorum",
+        alcoholHabit: String = "Söylemek istemiyorum",
+        university: String = "",
+        interests: [String] = []
     ) {
         self.id = UUID().uuidString
         self.ownerUserId = ownerUserId
         self.firstName = firstName
         self.lastName = lastName
-        self.age = age
+        self.age = 18 // Default age if birthday is missing
         self.city = city
         self.jobTitle = jobTitle
         self.bio = bio
@@ -79,9 +85,17 @@ final class Profile {
         self.lookingForGenderRaw = lookingForGender.rawValue
         self.avatarSymbol = avatarSymbol
         self.favoriteMovieGenres = favoriteMovieGenres
+        self.birthday = birthday
         self.height = height
-        self.zodiac = zodiac
         self.smokingHabit = smokingHabit
+        self.alcoholHabit = alcoholHabit
+        self.university = university
+        self.interests = interests
+    }
+
+    var calculatedAge: Int {
+        guard let birthday = birthday else { return 18 }
+        return Calendar.current.dateComponents([.year], from: birthday, to: .now).year ?? 18
     }
 
     var name: String {
@@ -117,14 +131,16 @@ final class MediaItem {
     @Attribute(.unique) var id: String
     var title: String
     var typeRaw: String
+    var coverImage: String? // SF Symbol or URL string
 
     // ✅ DiscoverView sıralaması için
     var createdAt: Date
 
-    init(title: String, type: MediaType) {
+    init(title: String, type: MediaType, coverImage: String? = nil) {
         self.id = UUID().uuidString
         self.title = title
         self.typeRaw = type.rawValue
+        self.coverImage = coverImage
         self.createdAt = .now
     }
 
@@ -164,13 +180,15 @@ final class LikeEdge {
     var fromProfileId: String
     var toProfileId: String
     var isLike: Bool
+    var isSuperLike: Bool
     var createdAt: Date
 
-    init(fromProfileId: String, toProfileId: String, isLike: Bool) {
+    init(fromProfileId: String, toProfileId: String, isLike: Bool, isSuperLike: Bool = false) {
         self.id = UUID().uuidString
         self.fromProfileId = fromProfileId
         self.toProfileId = toProfileId
         self.isLike = isLike
+        self.isSuperLike = isSuperLike
         self.createdAt = .now
     }
 }

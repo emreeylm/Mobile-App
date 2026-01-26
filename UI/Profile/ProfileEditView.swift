@@ -18,8 +18,9 @@ struct ProfileEditView: View {
     @State private var lookingFor: LookingForGender = .everyone
     
     @State private var height: String = ""
-    @State private var zodiac: String = ""
     @State private var smokingHabit: String = ""
+    @State private var alcoholHabit: String = ""
+    @State private var university: String = ""
 
     // photos
     @State private var photos: [Data] = []
@@ -55,11 +56,12 @@ struct ProfileEditView: View {
                             textField("Meslek", text: $jobTitle)
                             
                             HStack(spacing: 10) {
-                                textField("Boy (örn: 175 cm)", text: $height)
-                                textField("Burç", text: $zodiac)
+                                textField("Boy", text: $height)
+                                textField("Sigara", text: $smokingHabit)
                             }
                             
-                            textField("Sigara Kullanımı", text: $smokingHabit)
+                            textField("Alkol Kullanımı", text: $alcoholHabit)
+                            textField("Üniversite", text: $university)
 
                             HStack {
                                 Text("Yaş: \(age)")
@@ -260,8 +262,9 @@ struct ProfileEditView: View {
         gender = profile.gender
         lookingFor = profile.lookingForGender
         height = profile.height
-        zodiac = profile.zodiac
         smokingHabit = profile.smokingHabit
+        alcoholHabit = profile.alcoholHabit
+        university = profile.university
 
         photos = profile.photos
             .sorted(by: { $0.order < $1.order })
@@ -284,8 +287,9 @@ struct ProfileEditView: View {
             profile.gender = gender
             profile.lookingForGender = lookingFor
             profile.height = height
-            profile.zodiac = zodiac
             profile.smokingHabit = smokingHabit
+            profile.alcoholHabit = alcoholHabit
+            profile.university = university
 
             // ✅ photos relation yeniden yaz
             profile.photos.removeAll()
@@ -315,8 +319,9 @@ struct ProfileEditView: View {
                 gender: gender,
                 lookingForGender: lookingFor,
                 height: height,
-                zodiac: zodiac,
-                smokingHabit: smokingHabit
+                smokingHabit: smokingHabit,
+                alcoholHabit: alcoholHabit,
+                university: university
             )
 
             for (idx, d) in photos.enumerated() {

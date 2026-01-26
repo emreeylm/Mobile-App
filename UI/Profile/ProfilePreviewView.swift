@@ -8,6 +8,12 @@ struct ProfilePreviewView: View {
     @Query private var mediaItems: [MediaItem]
     @Query private var profileMedia: [ProfileMedia]
 
+    var profile: Profile? // Optional: show specific profile
+    
+    private var displayProfile: Profile? {
+        profile ?? session.currentProfile
+    }
+
     @State private var showSignOut = false
 
     var body: some View {
@@ -16,31 +22,31 @@ struct ProfilePreviewView: View {
             AppTheme.background
                 .ignoresSafeArea()
 
-            if let profile = session.currentProfile {
+            if let p = displayProfile {
                 ScrollView {
                     VStack(spacing: 24) {
                         
                         // 1. Custom Header
-                        headerView
+                        headerView(isMe: p.id == session.currentProfile?.id)
                         
                         // 2. Main Profile Image
-                        mainImageView(profile: profile)
+                        mainImageView(profile: p)
                         
                         // 3. Identity Section
-                        identitySection(profile: profile)
+                        identitySection(profile: p)
                         
                         // 4. Info Grid
-                        infoGrid(profile: profile)
+                        infoGrid(profile: p)
                         
                         // 5. Personal Narrative
-                        bioSection(profile: profile)
+                        bioSection(profile: p)
                         
                         // 6. Interests (Genres)
-                        interestsSection(profile: profile)
+                        interestsSection(profile: p)
                         
                         // 7. My Media (Specific Movies & Series)
-                        mediaListSection(profile: profile, type: .movie, title: "FİLMLERİM")
-                        mediaListSection(profile: profile, type: .series, title: "DİZİLERİM")
+                        mediaListSection(profile: p, type: .movie, title: "FİLMLERİM")
+                        mediaListSection(profile: p, type: .series, title: "DİZİLERİM")
 
                         Spacer(minLength: 120) // Tab bar clearance
                     }
@@ -63,25 +69,38 @@ struct ProfilePreviewView: View {
 
     // MARK: - Components
 
-    private var headerView: some View {
+    private func headerView(isMe: Bool) -> some View {
         HStack {
+            if !isMe {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(AppTheme.text)
+                        .frame(width: 44, height: 44)
+                        .background(AppTheme.text.opacity(0.05))
+                        .clipShape(Circle())
+                }
+            }
+            
             Spacer()
 
-            Menu {
-                NavigationLink("Profili Düzenle") {
-                    ProfileEditView()
+            if isMe {
+                Menu {
+                    NavigationLink("Profili Düzenle") {
+                        ProfileEditView()
+                    }
+                    Button("Çıkış Yap", role: .destructive) {
+                        showSignOut = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(AppTheme.text)
+                        .frame(width: 44, height: 44)
+                        .background(AppTheme.text.opacity(0.05))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
                 }
-                Button("Çıkış Yap", role: .destructive) {
-                    showSignOut = true
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(AppTheme.text)
-                    .frame(width: 44, height: 44)
-                    .background(AppTheme.text.opacity(0.05))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
             }
         }
         .padding(.top, 10)
@@ -111,15 +130,9 @@ struct ProfilePreviewView: View {
                             .foregroundStyle(AppTheme.text.opacity(0.2))
                     )
             }
-
-            // Online Indicator
-            Circle()
-                .fill(AppTheme.accent)
-                .frame(width: 14, height: 14)
-                .overlay(Circle().stroke(AppTheme.main, lineWidth: 2))
-                .offset(x: -4, y: 4)
         }
     }
+
 
     private func identitySection(profile: Profile) -> some View {
         VStack(spacing: 8) {
@@ -127,36 +140,22 @@ struct ProfilePreviewView: View {
                 Text("\(profile.firstName), \(profile.age)")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(AppTheme.text)
-                
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundColor(AppTheme.accent)
-                    .font(.system(size: 20))
             }
 
             HStack(spacing: 6) {
-                Image(systemName: "mappin.and.ellipse")
-                    .foregroundColor(AppTheme.text.opacity(0.6))
-                    .font(.system(size: 16))
-                
                 Text(profile.city)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(AppTheme.text.opacity(0.6))
             }
-
-            Text("ŞİMDİ AKTİF")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(AppTheme.text.opacity(0.4))
-                .kerning(1.2)
-                .padding(.top, 4)
         }
     }
 
     private func infoGrid(profile: Profile) -> some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
             infoCard(icon: "ruler", value: profile.height, label: "BOY")
-            infoCard(icon: "sun.max", value: profile.zodiac, label: "BURÇ")
-            infoCard(icon: "briefcase", value: profile.jobTitle, label: "MESLEK")
-            infoCard(icon: "nosign", value: profile.smokingHabit, label: "ALIŞKANLIK")
+            infoCard(icon: "graduationcap", value: profile.university.isEmpty ? "Belirtilmedi" : profile.university, label: "EĞİTİM")
+            infoCard(icon: "briefcase", value: profile.jobTitle.isEmpty ? "Belirtilmedi" : profile.jobTitle, label: "MESLEK")
+            infoCard(icon: "nosign", value: profile.smokingHabit, label: "SİGARA")
         }
     }
 
@@ -174,21 +173,25 @@ struct ProfilePreviewView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(value.isEmpty ? "Belirtilmedi" : value)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(AppTheme.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 
                 Text(label)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(AppTheme.text.opacity(0.4))
                     .kerning(0.5)
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .frame(height: 72)
+        .frame(maxWidth: .infinity)
         .background(AppTheme.text.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: 22)
                 .stroke(AppTheme.text.opacity(0.08), lineWidth: 1)
         )
     }
@@ -296,68 +299,7 @@ struct ProfilePreviewView: View {
 
 // MARK: - Helper Views
 
-struct FlowLayout: View {
-    let items: [String]
-    let viewForItem: (String) -> AnyView
-    @State private var totalHeight = CGFloat.zero
 
-    init<V: View>(items: [String], @ViewBuilder viewForItem: @escaping (String) -> V) {
-        self.items = items
-        self.viewForItem = { AnyView(viewForItem($0)) }
-    }
-
-    var body: some View {
-        VStack {
-            GeometryReader { geometry in
-                self.generateContent(in: geometry)
-            }
-        }
-        .frame(height: totalHeight) // ✅ Dynamically set height
-    }
-
-    private func generateContent(in g: GeometryProxy) -> some View {
-        var width = CGFloat.zero
-        var height = CGFloat.zero
-
-        return ZStack(alignment: .topLeading) {
-            ForEach(self.items, id: \.self) { item in
-                self.viewForItem(item)
-                    .padding([.horizontal, .vertical], 4)
-                    .alignmentGuide(.leading, computeValue: { d in
-                        if (abs(width - d.width) > g.size.width) {
-                            width = 0
-                            height -= d.height
-                        }
-                        let result = width
-                        if item == self.items.last {
-                            width = 0 // last item
-                        } else {
-                            width -= d.width
-                        }
-                        return result
-                    })
-                    .alignmentGuide(.top, computeValue: { d in
-                        let result = height
-                        if item == self.items.last {
-                            height = 0 // last item
-                        }
-                        return result
-                    })
-            }
-        }
-        .background(viewHeightReader($totalHeight))
-    }
-
-    private func viewHeightReader(_ binding: Binding<CGFloat>) -> some View {
-        return GeometryReader { geometry -> Color in
-            let rect = geometry.frame(in: .local)
-            DispatchQueue.main.async {
-                binding.wrappedValue = rect.size.height
-            }
-            return .clear
-        }
-    }
-}
 
 #Preview {
     ProfilePreviewView()

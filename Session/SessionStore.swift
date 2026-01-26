@@ -50,7 +50,7 @@ final class SessionStore: ObservableObject {
         loadMyProfile(modelContext: modelContext)
     }
 
-    /// Demo kayıt: userId kaydeder ama profil oluşturmaz -> ProfileSetup'a gider.
+    /// Demo kayıt: userId kaydeder, profil SignUpFlowView içinde oluşturulur.
     func signUp(email: String, password: String, modelContext: ModelContext) {
         let uid = normalizeUserId(email)
         UserDefaults.standard.set(uid, forKey: userDefaultsKey)
@@ -59,7 +59,7 @@ final class SessionStore: ObservableObject {
         currentUserId = uid
         authErrorMessage = nil
 
-        // ✅ Profil daha yok: ProfileSetup ekranı bunu oluşturacak
+        // ✅ Profil SignUpFlowView akışı içinde oluşturulacak.
         currentProfile = nil
     }
 
@@ -84,7 +84,7 @@ final class SessionStore: ObservableObject {
         currentProfile = all.first(where: { $0.ownerUserId == uid })
     }
 
-    /// ProfileSetupView profil oluşturduktan sonra çağırabilirsin.
+    /// Yeni bir profil oluşturulduğunda oturumu güncellemek için kullanılır.
     func setCurrentProfile(_ profile: Profile) {
         currentProfile = profile
     }
