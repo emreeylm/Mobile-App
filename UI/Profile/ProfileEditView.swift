@@ -35,93 +35,127 @@ struct ProfileEditView: View {
         ZStack {
             AppTheme.background.ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: 24) {
-                    photosSection
+            VStack(spacing: 0) {
+                // Header with Back Button
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .bold))
+                            Text("Geri")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(AppTheme.text)
+                        .padding(.vertical, 8)
+                        .padding(.trailing, 16)
+                    }
+                    
+                    Spacer()
+                    
+                    Text("Profili Düzenle")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(AppTheme.text)
+                    
+                    Spacer()
+                    
+                    // Invisible filler to center title
+                    Color.clear.frame(width: 60, height: 10)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 10)
+                .padding(.bottom, 10)
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        photosSection
 
-                    VStack(alignment: .leading, spacing: 20) {
-                        Text("KİŞİSEL BİLGİLER")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(AppTheme.text.opacity(0.4))
-                            .kerning(1.2)
-                            .padding(.horizontal, 8)
+                        VStack(alignment: .leading, spacing: 20) {
+                            Text("KİŞİSEL BİLGİLER")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(AppTheme.text.opacity(0.4))
+                                .kerning(1.2)
+                                .padding(.horizontal, 8)
 
-                        VStack(spacing: 16) {
-                            HStack(spacing: 10) {
-                                textField("İsim", text: $firstName)
-                                textField("Soyisim", text: $lastName)
-                            }
-
-                            textField("Şehir", text: $city)
-                            textField("Meslek", text: $jobTitle)
-                            
-                            HStack(spacing: 10) {
-                                textField("Boy", text: $height)
-                                textField("Sigara", text: $smokingHabit)
-                            }
-                            
-                            textField("Alkol Kullanımı", text: $alcoholHabit)
-                            textField("Üniversite", text: $university)
-
-                            HStack {
-                                Text("Yaş: \(age)")
-                                    .font(.headline)
-                                    .foregroundColor(AppTheme.text)
-                                Spacer()
-                                Stepper("", value: $age, in: 18...80)
-                                    .labelsHidden()
-                            }
-                            .padding()
-                            .background(AppTheme.text.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
-
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("Cinsiyet")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundColor(AppTheme.text.opacity(0.6))
-                                Picker("Cinsiyet", selection: $gender) {
-                                    ForEach(Gender.allCases, id: \.self) { g in
-                                        Text(g.rawValue).tag(g)
-                                    }
+                            VStack(spacing: 16) {
+                                HStack(spacing: 10) {
+                                    textField("İsim", text: $firstName)
+                                    textField("Soyisim", text: $lastName)
                                 }
-                                .pickerStyle(.segmented)
-                            }
 
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("Tercih Edilen")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundColor(AppTheme.text.opacity(0.6))
-                                Picker("Eşleşilmek istenen", selection: $lookingFor) {
-                                    ForEach(LookingForGender.allCases, id: \.self) { g in
-                                        Text(g.rawValue).tag(g)
-                                    }
+                                textField("Şehir", text: $city)
+                                textField("Meslek", text: $jobTitle)
+                                
+                                HStack(spacing: 10) {
+                                    textField("Boy", text: $height)
+                                    textField("Sigara", text: $smokingHabit)
                                 }
-                                .pickerStyle(.segmented)
-                            }
+                                
+                                textField("Alkol Kullanımı", text: $alcoholHabit)
+                                textField("Üniversite", text: $university)
 
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Biyografi")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundColor(AppTheme.text.opacity(0.6))
+                                HStack {
+                                    Text("Yaş: \(age)")
+                                        .font(.headline)
+                                        .foregroundColor(AppTheme.text)
+                                    Spacer()
+                                    Stepper("", value: $age, in: 18...80)
+                                        .labelsHidden()
+                                }
+                                .padding()
+                                .background(AppTheme.text.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
 
-                                TextEditor(text: $bio)
-                                    .frame(height: 120)
-                                    .padding(8)
-                                    .scrollContentBackground(.hidden)
-                                    .background(AppTheme.text.opacity(0.05))
-                                    .foregroundColor(AppTheme.text)
-                                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("Cinsiyet")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundColor(AppTheme.text.opacity(0.6))
+                                    Picker("Cinsiyet", selection: $gender) {
+                                        ForEach(Gender.allCases, id: \.self) { g in
+                                            Text(g.rawValue).tag(g)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+                                }
+
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("Tercih Edilen")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundColor(AppTheme.text.opacity(0.6))
+                                    Picker("Eşleşilmek istenen", selection: $lookingFor) {
+                                        ForEach(LookingForGender.allCases, id: \.self) { g in
+                                            Text(g.rawValue).tag(g)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+                                }
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Biyografi")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundColor(AppTheme.text.opacity(0.6))
+
+                                    TextEditor(text: $bio)
+                                        .frame(height: 120)
+                                        .padding(8)
+                                        .scrollContentBackground(.hidden)
+                                        .background(AppTheme.text.opacity(0.05))
+                                        .foregroundColor(AppTheme.text)
+                                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
+                                }
                             }
                         }
-                    }
 
-                    saveButton
-                    
-                    Spacer(minLength: 40)
+                        saveButton
+                        
+                        Spacer(minLength: 40)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
                 }
-                .padding(24)
             }
         }
         .navigationBarHidden(true)
@@ -154,10 +188,11 @@ struct ProfileEditView: View {
                         if let ui = UIImage(data: photos[idx]) {
                             Image(uiImage: ui)
                                 .resizable()
-                                .scaledToFill()
-                                .frame(height: 110)
-                                .clipped()
+                                .aspectRatio(1, contentMode: .fill)
+                                .frame(maxWidth: .infinity)
+                                .aspectRatio(1, contentMode: .fit)
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .clipped()
                         }
 
                         Button {
@@ -180,13 +215,15 @@ struct ProfileEditView: View {
                     ) {
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(AppTheme.text.opacity(0.1), style: StrokeStyle(lineWidth: 1, dash: [4]))
-                            .frame(height: 110)
+                            .aspectRatio(1, contentMode: .fit)
+                            .frame(maxWidth: .infinity)
                             .overlay(
                                 Image(systemName: "plus")
                                     .font(.system(size: 24, weight: .bold))
                                     .foregroundColor(AppTheme.accent)
                             )
                             .background(AppTheme.text.opacity(0.02))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
                 }
             }
@@ -229,16 +266,42 @@ struct ProfileEditView: View {
         Task {
             for item in items {
                 if photos.count >= maxPhotos { break }
-                if let data = try? await item.loadTransferable(type: Data.self) {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    
+                    // Optimize image: Max 1000px and 0.7 compression
+                    let optimizedData = compressImage(uiImage)
+                    
                     await MainActor.run {
-                        if photos.count < maxPhotos {
-                            photos.append(data)
+                        if photos.count < maxPhotos, let finalData = optimizedData {
+                            photos.append(finalData)
                         }
                     }
                 }
             }
             await MainActor.run { selectedPhotos = [] }
         }
+    }
+
+    private func compressImage(_ image: UIImage) -> Data? {
+        let maxDimension: CGFloat = 1000
+        let size = image.size
+        
+        var newSize = size
+        if size.width > maxDimension || size.height > maxDimension {
+            if size.width > size.height {
+                newSize = CGSize(width: maxDimension, height: size.height * (maxDimension / size.width))
+            } else {
+                newSize = CGSize(width: size.width * (maxDimension / size.height), height: maxDimension)
+            }
+        }
+        
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resizedImage = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        
+        return resizedImage.jpegData(compressionQuality: 0.7)
     }
 
     private func textField(_ title: String, text: Binding<String>) -> some View {

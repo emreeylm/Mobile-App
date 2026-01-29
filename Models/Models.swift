@@ -129,18 +129,24 @@ final class ProfilePhoto {
 @Model
 final class MediaItem {
     @Attribute(.unique) var id: String
+    var tmdbId: Int?
     var title: String
     var typeRaw: String
     var coverImage: String? // SF Symbol or URL string
-
+    var posterPath: String?
+    var backdropPath: String?
+    
     // ✅ DiscoverView sıralaması için
     var createdAt: Date
 
-    init(title: String, type: MediaType, coverImage: String? = nil) {
+    init(title: String, type: MediaType, coverImage: String? = nil, tmdbId: Int? = nil, posterPath: String? = nil, backdropPath: String? = nil) {
         self.id = UUID().uuidString
         self.title = title
         self.typeRaw = type.rawValue
         self.coverImage = coverImage
+        self.tmdbId = tmdbId
+        self.posterPath = posterPath
+        self.backdropPath = backdropPath
         self.createdAt = .now
     }
 
@@ -151,6 +157,16 @@ final class MediaItem {
 
     var posterSymbol: String {
         type == .movie ? "film" : "tv"
+    }
+    
+    var posterURL: String? {
+        if let path = posterPath {
+            return "https://image.tmdb.org/t/p/w342\(path)"
+        }
+        if let bPath = backdropPath {
+            return "https://image.tmdb.org/t/p/w342\(bPath)"
+        }
+        return nil
     }
 }
 
@@ -224,19 +240,27 @@ final class ChatThread {
 }
 
 @Model
-final class ChatMessage {
+final class ChatMessage: Identifiable {
     @Attribute(.unique) var id: String
     var threadId: String
     var senderProfileId: String
     var text: String
+    var imageData: Data?
     var createdAt: Date
     var isRead: Bool
 
-    init(threadId: String, senderProfileId: String, text: String, isRead: Bool = false) {
+    init(
+        threadId: String, 
+        senderProfileId: String, 
+        text: String = "", 
+        imageData: Data? = nil, 
+        isRead: Bool = false
+    ) {
         self.id = UUID().uuidString
         self.threadId = threadId
         self.senderProfileId = senderProfileId
         self.text = text
+        self.imageData = imageData
         self.createdAt = .now
         self.isRead = isRead
     }

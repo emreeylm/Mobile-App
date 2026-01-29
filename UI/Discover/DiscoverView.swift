@@ -10,8 +10,11 @@ struct DiscoverView: View {
     @Query private var mediaItems: [MediaItem]
     @Query private var profileMedia: [ProfileMedia]
 
-    @State private var filterType: String = "Tümü" // Tümü, Filmler, Diziler
+    @State private var filterType: String = "Popüler" // Popüler, Filmler, Diziler
     @State private var search: String = ""
+    @State private var apiResults: [TMDBSearchResult] = []
+    @State private var searchTask: Task<Void, Never>?
+    @State private var isInitialLoad = true
 
     private let columns = [
         GridItem(.flexible(), spacing: 16),
@@ -39,7 +42,22 @@ struct DiscoverView: View {
             }
         }
         .navigationBarHidden(true)
-        .onAppear { seedIfNeeded() }
+        .onAppear { 
+            if isInitialLoad {
+                Task { await fetchInitialMedia() }
+                isInitialLoad = false
+            }
+        }
+        .onChange(of: search) { _, newValue in
+            searchMedia(query: newValue)
+        }
+        .onChange(of: filterType) { _, _ in
+            if search.isEmpty {
+                Task { await fetchInitialMedia() }
+            } else {
+                searchMedia(query: search)
+            }
+        }
     }
 
     // MARK: - Header UI
@@ -88,10 +106,9 @@ struct DiscoverView: View {
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                filterChip(title: "Tümü")
+                filterChip(title: "Popüler")
                 filterChip(title: "Filmler")
                 filterChip(title: "Diziler")
-                filterChip(title: "Popüler")
             }
         }
     }
@@ -120,45 +137,78 @@ struct DiscoverView: View {
     // MARK: - Media Grid
 
     private var mediaGrid: some View {
-        LazyVGrid(columns: columns, spacing: 20) {
-            ForEach(filtered, id: \.id) { item in
-                mediaCard(item)
+        Group {
+            if apiResults.isEmpty {
+                VStack(spacing: 20) {
+                    ProgressView()
+                    Text("İçerik yükleniyor...")
+                        .foregroundColor(AppTheme.text.opacity(0.4))
+                    Button("Tekrar Dene") { 
+                        Task { await fetchInitialMedia() }
+                    }
+                    .foregroundColor(AppTheme.accent)
+                }
+                .frame(maxWidth: .infinity, minHeight: 300)
+            } else {
+                LazyVGrid(columns: columns, spacing: 20) {
+                    ForEach(filtered, id: \.id) { result in
+                        mediaCard(result)
+                    }
+                }
             }
         }
     }
 
-    private func mediaCard(_ item: MediaItem) -> some View {
-        let added = isInMyList(item)
+    private func mediaCard(_ result: TMDBSearchResult) -> some View {
+        let added = isInMyList(result)
         
         return VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .topTrailing) {
-                // Placeholder poster
+                // TMDB Poster
                 RoundedRectangle(cornerRadius: 24)
                     .fill(AppTheme.text.opacity(0.05))
-                    .overlay(
-                        VStack(spacing: 8) {
-                            Image(systemName: item.posterSymbol)
-                                .font(.system(size: 30))
-                                .foregroundStyle(AppTheme.text.opacity(0.1))
-                            
-                            // Visual flavor for different cards
-                            if item.title == "Inception" {
-                                Image(systemName: "brain.head.profile")
-                                    .font(.system(size: 40))
-                                    .foregroundStyle(LinearGradient(colors: [.blue, .orange], startPoint: .top, endPoint: .bottom))
-                            } else if item.title == "Interstellar" {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 40))
-                                    .foregroundStyle(LinearGradient(colors: [.yellow, .black], startPoint: .top, endPoint: .bottom))
+                    .overlay {
+                        if let urlString = result.posterURL, let url = URL(string: urlString) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image.resizable()
+                                         .scaledToFill()
+                                case .failure(_):
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "photo.on.rectangle.angled")
+                                            .font(.system(size: 30))
+                                        Text(result.displayName)
+                                            .font(.caption2)
+                                            .multilineTextAlignment(.center)
+                                            .padding(.horizontal, 4)
+                                    }
+                                    .foregroundColor(AppTheme.text.opacity(0.15))
+                                case .empty:
+                                    ProgressView()
+                                        .tint(AppTheme.accent)
+                                @unknown default:
+                                    EmptyView()
+                                }
                             }
-                        }
-                    )
+                            } else {
+                                VStack(spacing: 8) {
+                                    Image(systemName: result.mediaType == .movie ? "film" : "tv")
+                                        .font(.system(size: 30))
+                                    Text(result.displayName)
+                                        .font(.caption2)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 8)
+                                }
+                                .foregroundColor(AppTheme.text.opacity(0.15))
+                            }
+                    }
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 24))
                 
                 // Add/Remove Button
                 Button {
-                    toggle(item)
+                    toggle(result)
                 } label: {
                     ZStack {
                         Circle()
@@ -173,7 +223,7 @@ struct DiscoverView: View {
                 }
             }
             
-            Text(item.title)
+            Text(result.displayName)
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(AppTheme.text)
                 .lineLimit(1)
@@ -182,45 +232,137 @@ struct DiscoverView: View {
 
     // MARK: - Logic
 
-    private var filtered: [MediaItem] {
-        let s = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    private var filtered: [TMDBSearchResult] {
+        return apiResults
+    }
+
+    private func searchMedia(query: String) {
+        searchTask?.cancel()
         
-        return mediaItems
-            .filter { item in
-                if filterType == "Filmler" { return item.type == .movie }
-                if filterType == "Diziler" { return item.type == .series }
-                return true
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty {
+            Task { await fetchInitialMedia() }
+            return
+        }
+
+        let type: MediaType = filterType == "Diziler" ? .series : .movie
+
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if Task.isCancelled { return }
+            
+            do {
+                if filterType == "Popüler" {
+                    async let movies = TMDBService.shared.search(query: q, type: .movie)
+                    async let series = TMDBService.shared.search(query: q, type: .series)
+                    let (mResults, sResults) = try await (movies, series)
+                    
+                    var combined: [TMDBSearchResult] = []
+                    let maxCount = max(mResults.count, sResults.count)
+                    for i in 0..<maxCount {
+                        if i < mResults.count { combined.append(mResults[i]) }
+                        if i < sResults.count { combined.append(sResults[i]) }
+                    }
+                    
+                    if !Task.isCancelled {
+                        await MainActor.run { self.apiResults = combined }
+                    }
+                } else {
+                    let type: MediaType = filterType == "Diziler" ? .series : .movie
+                    let results = try await TMDBService.shared.search(query: q, type: type)
+                    if !Task.isCancelled {
+                        await MainActor.run { self.apiResults = results }
+                    }
+                }
+            } catch {
+                print("TMDB Search Error: \(error)")
             }
-            .filter { s.isEmpty ? true : $0.title.lowercased().contains(s) }
-            .sorted { $0.title < $1.title }
-    }
-
-    private func isInMyList(_ item: MediaItem) -> Bool {
-        guard let me = session.currentProfile else { return false }
-        return profileMedia.contains(where: { $0.profileId == me.id && $0.mediaId == item.id })
-    }
-
-    private func toggle(_ item: MediaItem) {
-        guard let me = session.currentProfile else { return }
-        if let existing = profileMedia.first(where: { $0.profileId == me.id && $0.mediaId == item.id }) {
-            modelContext.delete(existing)
-        } else {
-            modelContext.insert(ProfileMedia(profileId: me.id, mediaId: item.id))
         }
     }
 
-    private func seedIfNeeded() {
-        if mediaItems.isEmpty == false { return }
+    private func fetchInitialMedia() async {
+        do {
+            if filterType == "Popüler" {
+                // Fetch both movies and series for Popular
+                async let movies = TMDBService.shared.fetchPopular(type: .movie)
+                async let series = TMDBService.shared.fetchPopular(type: .series)
+                
+                let (mResults, sResults) = try await (movies, series)
+                
+                // Mix them roughly
+                var combined: [TMDBSearchResult] = []
+                let maxCount = max(mResults.count, sResults.count)
+                for i in 0..<maxCount {
+                    if i < mResults.count { combined.append(mResults[i]) }
+                    if i < sResults.count { combined.append(sResults[i]) }
+                }
+                
+                await MainActor.run {
+                    self.apiResults = combined
+                }
+            } else {
+                let type: MediaType = filterType == "Diziler" ? .series : .movie
+                let results = try await TMDBService.shared.fetchPopular(type: type)
+                await MainActor.run {
+                    self.apiResults = results
+                }
+            }
+        } catch {
+            print("TMDB Popular Error: \(error)")
+        }
+    }
+
+    private func isInMyList(_ result: TMDBSearchResult) -> Bool {
+        guard let me = session.currentProfile else { return false }
+        return profileMedia.contains(where: { link in
+            link.profileId == me.id && mediaItems.first(where: { $0.id == link.mediaId })?.tmdbId == result.id
+        })
+    }
+
+    private func toggle(_ result: TMDBSearchResult) {
+        if isInMyList(result) {
+            remove(result)
+        } else {
+            add(result)
+        }
+    }
+
+    private func add(_ result: TMDBSearchResult) {
+        guard let me = session.currentProfile else { return }
         
-        let movies = [
-            "Inception", "Interstellar", "The Godfather", "Blade Runner 2049", 
-            "The Dark Knight", "Fight Club", "The Matrix", "Joker"
-        ].map { MediaItem(title: $0, type: .movie) }
+        let type: MediaType = filterType == "Diziler" ? .series : .movie
+        let existingItem = mediaItems.first(where: { $0.tmdbId == result.id })
+        let mediaItem: MediaItem
+        
+        if let existing = existingItem {
+            mediaItem = existing
+        } else {
+            mediaItem = MediaItem(
+                title: result.displayName,
+                type: type,
+                tmdbId: result.id,
+                posterPath: result.poster_path,
+                backdropPath: result.backdrop_path
+            )
+            modelContext.insert(mediaItem)
+        }
+        
+        if !isInMyList(result) {
+            modelContext.insert(ProfileMedia(profileId: me.id, mediaId: mediaItem.id))
+        }
+        
+        try? modelContext.save()
+    }
 
-        let series = [
-            "Breaking Bad", "Dark", "Sherlock", "The Office", "Stranger Things", "The Boys"
-        ].map { MediaItem(title: $0, type: .series) }
-
-        for m in (movies + series) { modelContext.insert(m) }
+    private func remove(_ result: TMDBSearchResult) {
+        guard let me = session.currentProfile else { return }
+        
+        let existingItem = mediaItems.first(where: { $0.tmdbId == result.id })
+        guard let mediaItem = existingItem else { return }
+        
+        let toDelete = profileMedia.filter { $0.profileId == me.id && $0.mediaId == mediaItem.id }
+        for l in toDelete { modelContext.delete(l) }
+        
+        try? modelContext.save()
     }
 }

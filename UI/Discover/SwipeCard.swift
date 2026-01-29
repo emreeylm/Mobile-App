@@ -6,31 +6,43 @@ struct SwipeCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             RoundedRectangle(cornerRadius: 28)
-                .fill(.ultraThinMaterial)
+                .fill(AppTheme.text.opacity(0.05))
+            
+            if let urlString = item.posterURL, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable()
+                             .scaledToFill()
+                    case .failure(_):
+                        Image(systemName: "photo")
+                            .foregroundColor(.white.opacity(0.3))
+                    case .empty:
+                        ProgressView()
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 28))
+            }
 
-            VStack(alignment: .leading, spacing: 10) {
+            // Dark overlay for readability
+            LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+                .clipShape(RoundedRectangle(cornerRadius: 28))
+
+            VStack(alignment: .leading, spacing: 6) {
                 Spacer()
 
                 Text(item.title)
-                    .font(.title2.weight(.bold))
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
 
                 Text(item.type == .movie ? "Film" : "Dizi")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.8))
             }
-            .padding(18)
-
-            // ✅ Poster yerine ikon (posterSymbol yoktu)
-            VStack {
-                HStack {
-                    Spacer()
-                    Image(systemName: item.type == .movie ? "film" : "tv")
-                        .font(.system(size: 42, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(18)
-                }
-                Spacer()
-            }
+            .padding(24)
         }
         .shadow(color: .black.opacity(0.15), radius: 18, y: 10)
     }

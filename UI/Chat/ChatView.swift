@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct ChatView: View {
 
@@ -16,6 +17,7 @@ struct ChatView: View {
 
     @Query private var allMessages: [ChatMessage]
     @State private var text: String = ""
+    @State private var selectedItem: PhotosPickerItem?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -139,10 +141,20 @@ struct ChatView: View {
             Divider().background(AppTheme.text.opacity(0.05))
             
             HStack(spacing: 12) {
-                Button(action: {}) {
+                PhotosPicker(selection: $selectedItem, matching: .images) {
                     Image(systemName: "plus")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(AppTheme.text.opacity(0.6))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .onChange(of: selectedItem) { _, newItem in
+                    Task {
+                        if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                            sendPhoto(data)
+                        }
+                        selectedItem = nil
+                    }
                 }
                 
                 // Input Field
@@ -152,32 +164,23 @@ struct ChatView: View {
                         .foregroundColor(AppTheme.text)
                         .padding(.vertical, 10)
                         .padding(.leading, 16)
-                    
-                    Button(action: {
-                        send()
-                    }) {
-                        Image(systemName: "face.smiling")
-                            .font(.system(size: 20))
-                            .foregroundStyle(AppTheme.text.opacity(0.3))
-                    }
-                    .padding(.trailing, 12)
                 }
                 .background(AppTheme.text.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 24))
                 
-                // Mic or Send
-                Button(action: {
-                    if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        // Mic trigger
-                    } else {
+                // Send Button
+                if !text.isEmpty {
+                    Button(action: {
                         send()
+                    }) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(AppTheme.text.opacity(0.6))
                     }
-                }) {
-                    Image(systemName: text.isEmpty ? "mic.fill" : "paperplane.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(AppTheme.text.opacity(0.6))
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: text.isEmpty)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(AppTheme.text.opacity(0.02))
@@ -204,15 +207,28 @@ struct ChatView: View {
             if isMe { Spacer(minLength: 60) }
 
             VStack(alignment: isMe ? .trailing : .leading, spacing: 4) {
-                Text(msg.text)
-                    .font(.system(size: 16))
-                    .foregroundStyle(isMe ? AppTheme.main : AppTheme.text)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        isMe ? AppTheme.accent : AppTheme.text.opacity(0.05)
-                    )
-                    .clipShape(ChatBubbleShape(isMe: isMe))
+                if let data = msg.imageData, let ui = UIImage(data: data) {
+                    Image(uiImage: ui)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 250)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .padding(4)
+                        .background(isMe ? AppTheme.accent : AppTheme.text.opacity(0.05))
+                        .clipShape(ChatBubbleShape(isMe: isMe))
+                }
+
+                if !msg.text.isEmpty {
+                    Text(msg.text)
+                        .font(.system(size: 16))
+                        .foregroundStyle(isMe ? AppTheme.main : AppTheme.text)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            isMe ? AppTheme.accent : AppTheme.text.opacity(0.05)
+                        )
+                        .clipShape(ChatBubbleShape(isMe: isMe))
+                }
                 
                 HStack(spacing: 4) {
                     Text(timeText(msg.createdAt))
@@ -281,6 +297,31 @@ struct ChatView: View {
         activeThread.updatedAt = .now
         try? modelContext.save()
         text = ""
+    }
+
+    private func sendPhoto(_ data: Data) {
+        guard let me = session.currentProfile else { return }
+        
+        // Create thread if it doesn't exist
+        let activeThread: ChatThread
+        if let existing = thread {
+            activeThread = existing
+        } else {
+            let newThread = ChatThread(myProfileId: me.id, otherProfileId: otherProfile.id)
+            modelContext.insert(newThread)
+            self.thread = newThread
+            activeThread = newThread
+        }
+
+        let msg = ChatMessage(
+            threadId: activeThread.id,
+            senderProfileId: me.id,
+            imageData: data
+        )
+
+        modelContext.insert(msg)
+        activeThread.updatedAt = .now
+        try? modelContext.save()
     }
 
     private func unmatchAction() {

@@ -4,7 +4,7 @@ import Foundation
 enum AppModelContainer {
 
     /// Model değiştikçe bunu arttır (eski store’u okumaya çalışmasın)
-    private static let storeName = "DateApp_v3"   // 👈 gerekirse v4 yap
+    private static let storeName = "DateApp_v5"   // 👈 v5 yapıldı
 
     static func make(inMemory: Bool = false) -> ModelContainer {
 

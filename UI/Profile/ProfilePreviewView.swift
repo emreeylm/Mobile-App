@@ -23,36 +23,39 @@ struct ProfilePreviewView: View {
                 .ignoresSafeArea()
 
             if let p = displayProfile {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        
-                        // 1. Custom Header
-                        headerView(isMe: p.id == session.currentProfile?.id)
-                        
-                        // 2. Main Profile Image
-                        mainImageView(profile: p)
-                        
-                        // 3. Identity Section
-                        identitySection(profile: p)
-                        
-                        // 4. Info Grid
-                        infoGrid(profile: p)
-                        
-                        // 5. Personal Narrative
-                        bioSection(profile: p)
-                        
-                        // 6. Interests (Genres)
-                        interestsSection(profile: p)
-                        
-                        // 7. My Media (Specific Movies & Series)
-                        mediaListSection(profile: p, type: .movie, title: "FİLMLERİM")
-                        mediaListSection(profile: p, type: .series, title: "DİZİLERİM")
+                VStack(spacing: 0) {
+                    // 1. Fixed Custom Header
+                    headerView(isMe: p.id == session.currentProfile?.id)
+                        .padding(.horizontal, 24)
+                    
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            // 2. Main Profile Image
+                            mainImageView(profile: p)
+                            
+                            // 3. Identity Section
+                            identitySection(profile: p)
+                            
+                            // 4. Info Grid
+                            infoGrid(profile: p)
+                            
+                            // 5. Personal Narrative
+                            bioSection(profile: p)
+                            
+                            // 6. Interests (Genres)
+                            interestsSection(profile: p)
+                            
+                            // 7. My Media (Specific Movies & Series)
+                            mediaListSection(profile: p, type: .movie, title: "FİLMLERİM")
+                            mediaListSection(profile: p, type: .series, title: "DİZİLERİM")
 
-                        Spacer(minLength: 120) // Tab bar clearance
+                            Spacer(minLength: 120) // Tab bar clearance
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 12)
                     }
-                    .padding(.horizontal, 24)
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
             } else {
                 Text("Profil bulunamadı.")
                     .foregroundStyle(.secondary)
@@ -100,6 +103,7 @@ struct ProfilePreviewView: View {
                         .background(AppTheme.text.opacity(0.05))
                         .clipShape(Circle())
                         .overlay(Circle().stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
+                        .contentShape(Rectangle()) // ✅ Improves touch area reliability
                 }
             }
         }
@@ -273,21 +277,55 @@ struct ProfilePreviewView: View {
                 VStack(spacing: 8) {
                     ForEach(list, id: \.id) { item in
                         HStack(spacing: 12) {
-                            Image(systemName: type == .movie ? "film" : "tv")
-                                .font(.system(size: 16))
-                                .foregroundColor(AppTheme.text.opacity(0.6))
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(AppTheme.text.opacity(0.05))
+                                    .frame(width: 40, height: 60)
+
+                                if let urlString = item.posterURL, let url = URL(string: urlString) {
+                                    AsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .success(let image):
+                                            image.resizable()
+                                                 .scaledToFill()
+                                        case .failure(_):
+                                            Image(systemName: "photo.on.rectangle.angled")
+                                                .font(.system(size: 14))
+                                                .foregroundColor(AppTheme.text.opacity(0.3))
+                                        case .empty:
+                                            ProgressView()
+                                                .tint(AppTheme.accent)
+                                                .scaleEffect(0.6)
+                                        @unknown default:
+                                            EmptyView()
+                                        }
+                                    }
+                                    .frame(width: 40, height: 60)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                } else {
+                                    Image(systemName: "photo.on.rectangle.angled")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(AppTheme.text.opacity(0.3))
+                                }
+                            }
                             
-                            Text(item.title)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(AppTheme.text)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundColor(AppTheme.text)
+                                
+                                Text(type == .movie ? "Film" : "Dizi")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppTheme.text.opacity(0.5))
+                            }
                             
                             Spacer()
                         }
-                        .padding(16)
+                        .padding(8)
                         .background(AppTheme.text.opacity(0.03))
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 18)
+                            RoundedRectangle(cornerRadius: 14)
                                 .stroke(AppTheme.text.opacity(0.05), lineWidth: 1)
                         )
                     }

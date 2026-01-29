@@ -29,6 +29,13 @@ struct SignUpFlowView: View {
     @State private var movieSearchQuery: String = ""
     @State private var seriesSearchQuery: String = ""
     
+    @State private var movieSearchResults: [TMDBSearchResult] = []
+    @State private var seriesSearchResults: [TMDBSearchResult] = []
+    @State private var isSearching = false
+
+    @State private var movieSearchTask: Task<Void, Never>?
+    @State private var seriesSearchTask: Task<Void, Never>?
+    
     // PHASE 2 DATA
     @State private var selectedInterests: Set<String> = []
     @State private var heightValue: Int = 170
@@ -88,8 +95,19 @@ struct SignUpFlowView: View {
         } message: {
             Text(errorMessage)
         }
-        .onAppear { seedMediaIfNeeded() }
+        .onAppear { 
+            seedMediaIfNeeded()
+            fetchInitialMedia()
+        }
         .onChange(of: pickerItems) { _, newItems in loadSelectedPhotos(newItems) }
+        .onChange(of: movieSearchQuery) { _, newValue in
+            if newValue.isEmpty { fetchInitialMedia() }
+            else { searchMedia(query: newValue, type: .movie) }
+        }
+        .onChange(of: seriesSearchQuery) { _, newValue in
+            if newValue.isEmpty { fetchInitialMedia() }
+            else { searchMedia(query: newValue, type: .series) }
+        }
     }
 
     private var setupHeader: some View {
@@ -194,8 +212,9 @@ struct SignUpFlowView: View {
                             if let ui = UIImage(data: photos[idx]) {
                                 Image(uiImage: ui)
                                     .resizable()
-                                    .scaledToFill()
-                                    .frame(width: (UIScreen.main.bounds.width - 72) / 3, height: 140)
+                                    .aspectRatio(1, contentMode: .fill)
+                                    .frame(maxWidth: .infinity)
+                                    .aspectRatio(1, contentMode: .fit)
                                     .clipped()
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                                     .overlay(alignment: .topTrailing) {
@@ -212,7 +231,8 @@ struct SignUpFlowView: View {
                             PhotosPicker(selection: $pickerItems, maxSelectionCount: 1, matching: .images) {
                                 RoundedRectangle(cornerRadius: 16)
                                     .fill(AppTheme.text.opacity(0.05))
-                                    .frame(height: 140)
+                                    .aspectRatio(1, contentMode: .fit)
+                                    .frame(maxWidth: .infinity)
                                     .overlay {
                                         Image(systemName: "plus")
                                             .font(.system(size: 24, weight: .bold))
@@ -296,25 +316,35 @@ struct SignUpFlowView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.accent.opacity(0.2), lineWidth: 1))
 
-                ScrollView {
-                    let filteredMovies = movies.filter { 
-                        movieSearchQuery.isEmpty ? true : $0.title.localizedCaseInsensitiveContains(movieSearchQuery) 
+                if movieSearchResults.isEmpty {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                        Text("Filmler yükleniyor...")
+                            .foregroundColor(AppTheme.text.opacity(0.4))
+                        Button("Tekrar Dene") { fetchInitialMedia() }
+                            .foregroundColor(AppTheme.accent)
                     }
-                    
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                        ForEach(filteredMovies, id: \.id) { movie in
-                            mediaBox(item: movie, isSelected: selectedMovieIds.contains(movie.id)) {
-                                if selectedMovieIds.contains(movie.id) { selectedMovieIds.remove(movie.id) }
-                                else { selectedMovieIds.insert(movie.id) }
+                    .frame(maxWidth: .infinity, minHeight: 200)
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                            ForEach(movieSearchResults) { result in
+                                let isSelected = selectedMovieIds.contains("\(result.id)")
+                                tmdbMediaBox(result: result, isSelected: isSelected) {
+                                    toggleSelection(result: result, type: .movie)
+                                }
                             }
                         }
+                        .padding(.bottom, 20)
                     }
-                    .padding(.bottom, 20)
                 }
             }
         } nextAction: {
             if selectedMovieIds.count >= minSelection { withAnimation { step = 9 } }
             else { fail("Lütfen en az \(minSelection) film seçin.") }
+        }
+        .onAppear {
+            if movieSearchResults.isEmpty { fetchInitialMedia() }
         }
     }
 
@@ -338,25 +368,35 @@ struct SignUpFlowView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.accent.opacity(0.2), lineWidth: 1))
 
-                ScrollView {
-                    let filteredSeries = series.filter { 
-                        seriesSearchQuery.isEmpty ? true : $0.title.localizedCaseInsensitiveContains(seriesSearchQuery) 
+                if seriesSearchResults.isEmpty {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                        Text("Diziler yükleniyor...")
+                            .foregroundColor(AppTheme.text.opacity(0.4))
+                        Button("Tekrar Dene") { fetchInitialMedia() }
+                            .foregroundColor(AppTheme.accent)
                     }
-                    
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                        ForEach(filteredSeries, id: \.id) { s in
-                            mediaBox(item: s, isSelected: selectedSeriesIds.contains(s.id)) {
-                                if selectedSeriesIds.contains(s.id) { selectedSeriesIds.remove(s.id) }
-                                else { selectedSeriesIds.insert(s.id) }
+                    .frame(maxWidth: .infinity, minHeight: 200)
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                            ForEach(seriesSearchResults) { result in
+                                let isSelected = selectedSeriesIds.contains("\(result.id)")
+                                tmdbMediaBox(result: result, isSelected: isSelected) {
+                                    toggleSelection(result: result, type: .series)
+                                }
                             }
                         }
+                        .padding(.bottom, 20)
                     }
-                    .padding(.bottom, 20)
                 }
             }
         } nextAction: {
             if selectedSeriesIds.count >= minSelection { withAnimation { step = 10 } }
             else { fail("Lütfen en az \(minSelection) dizi seçin.") }
+        }
+        .onAppear {
+            if seriesSearchResults.isEmpty { fetchInitialMedia() }
         }
     }
 
@@ -563,7 +603,9 @@ struct SignUpFlowView: View {
     }
 
     private func selectionRow(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            action()
+        } label: {
             HStack {
                 Text(title)
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
@@ -597,21 +639,101 @@ struct SignUpFlowView: View {
         .buttonStyle(.plain)
     }
 
-    private func mediaBox(item: MediaItem, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func tmdbMediaBox(result: TMDBSearchResult, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+        } label: {
             VStack(alignment: .leading, spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 20)
                         .fill(AppTheme.text.opacity(0.05))
-                        .aspectRatio(2/3, contentMode: .fill)
+                        .aspectRatio(2/3, contentMode: .fit)
                         .overlay {
-                            if let img = item.coverImage {
+                            if let urlString = result.posterURL, let url = URL(string: urlString) {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image.resizable()
+                                             .scaledToFill()
+                                    case .failure(_):
+                                        VStack(spacing: 8) {
+                                            Image(systemName: "photo.on.rectangle.angled")
+                                                .font(.system(size: 30))
+                                            Text(result.displayName)
+                                                .font(.caption2)
+                                                .multilineTextAlignment(.center)
+                                                .padding(.horizontal, 4)
+                                        }
+                                        .foregroundColor(AppTheme.accent.opacity(0.3))
+                                    case .empty:
+                                        ProgressView()
+                                            .tint(AppTheme.accent)
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else {
+                                VStack(spacing: 12) {
+                                    Image(systemName: result.mediaType == .movie ? "film" : "tv")
+                                        .font(.system(size: 36, weight: .thin))
+                                    Text(result.displayName)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 8)
+                                }
+                                .foregroundColor(AppTheme.accent.opacity(0.3))
+                            }
+                        }
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                    
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(AppTheme.accent, lineWidth: 3)
+                        
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(AppTheme.accent)
+                            .background(Circle().fill(.black).padding(2))
+                            .offset(x: 10, y: -10)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    }
+                }
+                Text(result.displayName)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(isSelected ? AppTheme.accent : AppTheme.text)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func mediaBox(item: MediaItem, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(AppTheme.text.opacity(0.05))
+                        .aspectRatio(2/3, contentMode: .fit)
+                        .overlay {
+                            if let urlString = item.posterURL, let url = URL(string: urlString) {
+                                AsyncImage(url: url) { image in
+                                    image.resizable()
+                                         .scaledToFill()
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                            } else if let img = item.coverImage {
                                 Image(systemName: img)
                                     .font(.system(size: 40, weight: .thin))
                                     .foregroundColor(AppTheme.accent.opacity(0.4))
                             }
                         }
                         .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
                     
                     if isSelected {
                         RoundedRectangle(cornerRadius: 20)
@@ -681,8 +803,29 @@ struct SignUpFlowView: View {
         
         modelContext.insert(profile)
         
-        for id in selectedMovieIds { modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: id)) }
-        for id in selectedSeriesIds { modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: id)) }
+        // Save selected media items to SwiftData
+        for result in movieSearchResults where selectedMovieIds.contains("\(result.id)") {
+            let item = MediaItem(
+                title: result.displayName, 
+                type: .movie, 
+                tmdbId: result.id, 
+                posterPath: result.poster_path,
+                backdropPath: result.backdrop_path
+            )
+            modelContext.insert(item)
+            modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: item.id))
+        }
+        for result in seriesSearchResults where selectedSeriesIds.contains("\(result.id)") {
+            let item = MediaItem(
+                title: result.displayName, 
+                type: .series, 
+                tmdbId: result.id, 
+                posterPath: result.poster_path,
+                backdropPath: result.backdrop_path
+            )
+            modelContext.insert(item)
+            modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: item.id))
+        }
         
         try? modelContext.save()
         session.setCurrentProfile(profile)
@@ -695,6 +838,80 @@ struct SignUpFlowView: View {
         let series = ["Breaking Bad", "Stranger Things", "Dark", "Black Mirror", "The Office", "Friends"]
             .map { MediaItem(title: $0, type: .series, coverImage: "tv") }
         for m in (movies + series) { modelContext.insert(m) }
+    }
+
+    private func searchMedia(query: String, type: MediaType) {
+        if type == .movie { movieSearchTask?.cancel() }
+        else { seriesSearchTask?.cancel() }
+
+        let newTask = Task {
+            if query.isEmpty {
+                await MainActor.run {
+                    if type == .movie { movieSearchResults = [] }
+                    else { seriesSearchResults = [] }
+                }
+                return
+            }
+            
+            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4 sec
+            if Task.isCancelled { return }
+            
+            do {
+                print("TMDB: Searching \(type) -> \(query)")
+                let results = try await TMDBService.shared.search(query: query, type: type)
+                if Task.isCancelled { return }
+                
+                await MainActor.run {
+                    if type == .movie { 
+                        movieSearchResults = results 
+                        print("TMDB: Found \(results.count) movies")
+                    } else { 
+                        seriesSearchResults = results 
+                        print("TMDB: Found \(results.count) series")
+                    }
+                }
+            } catch {
+                print("TMDB Search Error: \(error.localizedDescription)")
+            }
+        }
+        
+        if type == .movie { movieSearchTask = newTask }
+        else { seriesSearchTask = newTask }
+    }
+
+    private func fetchInitialMedia() {
+        // Fetch popular to not show empty screen
+        Task {
+            do {
+                let m = try await TMDBService.shared.fetchPopular(type: .movie)
+                let s = try await TMDBService.shared.fetchPopular(type: .series)
+                await MainActor.run {
+                    self.movieSearchResults = m
+                    self.seriesSearchResults = s
+                }
+            } catch {
+                print("TMDB Popular Error: \(error)")
+            }
+        }
+    }
+
+    private func toggleSelection(result: TMDBSearchResult, type: MediaType) {
+        let idString = "\(result.id)"
+        if type == .movie {
+            if selectedMovieIds.contains(idString) {
+                selectedMovieIds.remove(idString)
+            } else {
+                selectedMovieIds.insert(idString)
+                // Ensure MediaItem exists in SwiftData for this ID? 
+                // We'll insert it during finishSignUp to avoid redundant objects
+            }
+        } else {
+            if selectedSeriesIds.contains(idString) {
+                selectedSeriesIds.remove(idString)
+            } else {
+                selectedSeriesIds.insert(idString)
+            }
+        }
     }
 }
 

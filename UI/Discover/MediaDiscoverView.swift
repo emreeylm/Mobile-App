@@ -11,6 +11,9 @@ struct MediaDiscoverView: View {
 
     @State private var selectedType: MediaType = .movie
     @State private var queryText: String = ""
+    @State private var apiResults: [TMDBSearchResult] = []
+    @State private var searchTask: Task<Void, Never>?
+    @State private var isInitialLoad = true
 
     private let headerHeight: CGFloat = 44
     private let titleTopExtra: CGFloat = 26
@@ -29,7 +32,22 @@ struct MediaDiscoverView: View {
             }
             .ignoresSafeArea(.container, edges: .top)
             .toolbar(.hidden, for: .navigationBar)
-            .task { seedMediaIfNeeded() }
+            .task { 
+                if isInitialLoad {
+                    await fetchInitialMedia()
+                    isInitialLoad = false
+                }
+            }
+            .onChange(of: queryText) { _, newValue in
+                searchMedia(query: newValue, type: selectedType)
+            }
+            .onChange(of: selectedType) { _, newValue in
+                if queryText.isEmpty {
+                    Task { await fetchInitialMedia() }
+                } else {
+                    searchMedia(query: queryText, type: newValue)
+                }
+            }
         }
     }
 
@@ -77,13 +95,21 @@ struct MediaDiscoverView: View {
                     let list = filteredItems()
 
                     if list.isEmpty {
-                        EmptyStateView(title: "Sonuç yok", subtitle: "Farklı bir arama deneyebilirsin.")
-                            .padding(.top, 20)
+                        VStack(spacing: 20) {
+                            ProgressView()
+                            Text("İçerik yükleniyor...")
+                                .foregroundColor(AppTheme.text.opacity(0.4))
+                            Button("Tekrar Dene") { 
+                                Task { await fetchInitialMedia() }
+                            }
+                            .foregroundColor(AppTheme.accent)
+                        }
+                        .padding(.top, 40)
                     } else {
                         LazyVStack(spacing: 10) {
                             ForEach(list, id: \.id) { item in
                                 MediaRow(
-                                    item: item,
+                                    result: item,
                                     isAdded: isAdded(item),
                                     onAdd: { add(item) },
                                     onRemove: { remove(item) }
@@ -101,32 +127,92 @@ struct MediaDiscoverView: View {
 
     // MARK: - Logic
 
-    private func filteredItems() -> [MediaItem] {
-        let base = items.filter { $0.type == selectedType }
-        let q = queryText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return base.sorted(by: { $0.createdAt > $1.createdAt }) }
-
-        return base
-            .filter { $0.title.lowercased().contains(q) }
-            .sorted(by: { $0.createdAt > $1.createdAt })
+    private func filteredItems() -> [TMDBSearchResult] {
+        return apiResults
     }
 
-    private func isAdded(_ item: MediaItem) -> Bool {
+    private func searchMedia(query: String, type: MediaType) {
+        searchTask?.cancel()
+        
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty {
+            Task { await fetchInitialMedia() }
+            return
+        }
+
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if Task.isCancelled { return }
+            
+            do {
+                let results = try await TMDBService.shared.search(query: q, type: type)
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        self.apiResults = results
+                    }
+                }
+            } catch {
+                print("TMDB Search Error: \(error)")
+            }
+        }
+    }
+
+    private func fetchInitialMedia() async {
+        do {
+            let results = try await TMDBService.shared.fetchPopular(type: selectedType)
+            await MainActor.run {
+                self.apiResults = results
+            }
+        } catch {
+            print("TMDB Popular Error: \(error)")
+        }
+    }
+
+    private func isAdded(_ result: TMDBSearchResult) -> Bool {
         guard let me = session.currentProfile else { return false }
-        return links.contains(where: { $0.profileId == me.id && $0.mediaId == item.id })
+        // We need to check if a MediaItem with this tmdbId already exists and is linked
+        return links.contains(where: { link in
+            link.profileId == me.id && items.first(where: { $0.id == link.mediaId })?.tmdbId == result.id
+        })
     }
 
-    private func add(_ item: MediaItem) {
+    private func add(_ result: TMDBSearchResult) {
         guard let me = session.currentProfile else { return }
-        if isAdded(item) { return }
-        modelContext.insert(ProfileMedia(profileId: me.id, mediaId: item.id))
+        
+        // 1. Find or create MediaItem
+        let existingItem = items.first(where: { $0.tmdbId == result.id })
+        let mediaItem: MediaItem
+        
+        if let existing = existingItem {
+            mediaItem = existing
+        } else {
+            mediaItem = MediaItem(
+                title: result.displayName,
+                type: selectedType,
+                tmdbId: result.id,
+                posterPath: result.poster_path,
+                backdropPath: result.backdrop_path
+            )
+            modelContext.insert(mediaItem)
+        }
+        
+        // 2. Link to profile
+        if !isAdded(result) {
+            modelContext.insert(ProfileMedia(profileId: me.id, mediaId: mediaItem.id))
+        }
+        
         try? modelContext.save()
     }
 
-    private func remove(_ item: MediaItem) {
+    private func remove(_ result: TMDBSearchResult) {
         guard let me = session.currentProfile else { return }
-        let toDelete = links.filter { $0.profileId == me.id && $0.mediaId == item.id }
+        
+        let existingItem = items.first(where: { $0.tmdbId == result.id })
+        guard let mediaItem = existingItem else { return }
+        
+        let toDelete = links.filter { $0.profileId == me.id && $0.mediaId == mediaItem.id }
         for l in toDelete { modelContext.delete(l) }
+        
         try? modelContext.save()
     }
 
@@ -158,7 +244,7 @@ struct MediaDiscoverView: View {
 // MARK: - Row
 
 private struct MediaRow: View {
-    let item: MediaItem
+    let result: TMDBSearchResult
     let isAdded: Bool
     let onAdd: () -> Void
     let onRemove: () -> Void
@@ -167,21 +253,43 @@ private struct MediaRow: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(.thinMaterial)
-                    .frame(width: 56, height: 56)
+                    .fill(AppTheme.text.opacity(0.05))
+                    .frame(width: 56, height: 80)
 
-                Image(systemName: item.type == .movie ? "film" : "tv")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                if let urlString = result.posterURL, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable()
+                                 .scaledToFill()
+                        case .failure(_):
+                            Image(systemName: "photo.on.rectangle.angled")
+                                .font(.system(size: 16))
+                                .foregroundColor(AppTheme.accent.opacity(0.3))
+                        case .empty:
+                            ProgressView()
+                                .tint(AppTheme.accent)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                    .frame(width: 56, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                } else {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(AppTheme.accent.opacity(0.3))
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.headline)
+                Text(result.displayName)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(AppTheme.text)
 
-                Text(item.type == .movie ? "Film" : "Dizi")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(result.release_date?.prefix(4) ?? "")
+                    .font(.system(size: 13))
+                    .foregroundStyle(AppTheme.text.opacity(0.6))
             }
 
             Spacer()
@@ -191,11 +299,11 @@ private struct MediaRow: View {
             } label: {
                 Image(systemName: isAdded ? "checkmark.circle.fill" : "plus.circle.fill")
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(isAdded ? .green : .blue)
+                    .foregroundStyle(isAdded ? .green : AppTheme.accent)
             }
         }
         .padding(12)
-        .background(.ultraThinMaterial)
+        .background(AppTheme.text.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }
