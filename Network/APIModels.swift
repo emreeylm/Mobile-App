@@ -27,6 +27,10 @@ struct TokenResponse: Decodable {
     let is_new_user: Bool
 }
 
+struct CheckEmailResponse: Decodable {
+    let exists: Bool
+}
+
 // MARK: - User
 struct UserResponse: Decodable {
     let id: String

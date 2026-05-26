@@ -30,6 +30,7 @@ struct SignUpFlowView: View {
         _step = State(initialValue: isSocialLogin ? 3 : 1)
         _firstName = State(initialValue: prefillName)
     }
+    @State private var isCheckingEmail = false
     @State private var city: String = ""
     @State private var birthday: Date = Calendar.current.date(byAdding: .year, value: -20, to: .now) ?? .now
     @State private var gender: Gender = .male
@@ -198,7 +199,8 @@ struct SignUpFlowView: View {
     private var emailStep: some View {
         stepContainer(
             title: "E-postan nedir?",
-            subtitle: "Hesabını oluşturmak için geçerli bir e-posta adresi gir."
+            subtitle: "Hesabını oluşturmak için geçerli bir e-posta adresi gir.",
+            isLoading: isCheckingEmail
         ) {
             TextField("ornek@mail.com", text: $email)
                 .keyboardType(.emailAddress)
@@ -206,8 +208,26 @@ struct SignUpFlowView: View {
                 .autocorrectionDisabled()
                 .setupTextFieldStyle()
         } nextAction: {
-            if email.contains("@") && email.contains(".") { withAnimation { step = 2 } }
-            else { fail("Lütfen geçerli bir e-posta adresi gir.") }
+            let e = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard e.contains("@") && e.contains(".") else {
+                fail("Lütfen geçerli bir e-posta adresi gir.")
+                return
+            }
+            isCheckingEmail = true
+            Task {
+                defer { isCheckingEmail = false }
+                do {
+                    let resp = try await APIClient.shared.checkEmail(e)
+                    if resp.exists {
+                        fail("Bu e-posta zaten kayıtlı.\nGiriş yapmayı deneyin.")
+                    } else {
+                        withAnimation { step = 2 }
+                    }
+                } catch {
+                    // Ağ hatası veya backend ulaşılamıyor → devam et (register'da yine kontrol edilir)
+                    withAnimation { step = 2 }
+                }
+            }
         }
     }
 

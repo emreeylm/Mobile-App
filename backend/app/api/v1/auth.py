@@ -16,6 +16,16 @@ from redis.asyncio import Redis
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+@router.get("/check-email")
+async def check_email(email: str, db: AsyncSession = Depends(get_db)):
+    """Email adresinin kayıtlı olup olmadığını döner. Auth gerektirmez."""
+    result = await db.execute(
+        select(Kullanici).where(Kullanici.email == email.lower().strip())
+    )
+    exists = result.scalar_one_or_none() is not None
+    return {"exists": exists}
+
+
 @router.post("/social", response_model=TokenResponse)
 async def social_login(
     body: SocialAuthRequest,

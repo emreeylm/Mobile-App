@@ -195,6 +195,12 @@ extension APIClient {
                           requiresAuth: false)
     }
 
+    func checkEmail(_ email: String) async throws -> CheckEmailResponse {
+        try await request("GET", path: "/api/v1/auth/check-email",
+                          queryItems: [URLQueryItem(name: "email", value: email)],
+                          requiresAuth: false)
+    }
+
     func emailRegister(email: String, password: String, isim: String) async throws -> TokenResponse {
         try await request("POST", path: "/api/v1/auth/register",
                           body: EmailRegisterRequest(email: email, password: password, isim: isim),
