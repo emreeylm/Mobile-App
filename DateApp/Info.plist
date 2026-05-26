@@ -26,6 +26,10 @@
 		</dict>
 	</array>
 
+	<!-- Konum izni -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Yakınındaki kişilerle eşleşebilmemiz için konumuna ihtiyacımız var.</string>
+
 	<!-- Yerel geliştirme için HTTP'ye izin -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

@@ -647,13 +647,12 @@ struct SignUpFlowView: View {
             title: "Hangi şehirdesin?",
             subtitle: "Yakınındaki kişilerle eşleştirmek için kullanılır."
         ) {
-            TextField("Şehir adı", text: $city)
-                .setupTextFieldStyle()
+            CityPickerView(selectedCity: $city)
         } nextAction: {
-            if !city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if !city.isEmpty {
                 withAnimation { step = 5 }
             } else {
-                fail("Lütfen şehrinizi girin.")
+                fail("Lütfen şehrinizi seçin.")
             }
         }
     }
@@ -679,7 +678,10 @@ struct SignUpFlowView: View {
             .frame(maxWidth: .infinity)
         } nextAction: {
             LocationManager.shared.requestPermission()
-            withAnimation { step = 6 }
+            // Sistem diyaloğunun kapanmasına zaman tanı, sonra bir sonraki adıma geç
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation { step = 6 }
+            }
         }
     }
 
