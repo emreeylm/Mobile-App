@@ -9,17 +9,24 @@ struct SignUpFlowView: View {
     @Environment(\.dismiss) private var dismiss
 
     // Sosyal giriş (Google/Apple) ile gelindiyse email+şifre adımları atlanır
-    var isSocialLogin: Bool = false
-    var prefillName: String = ""
+    let isSocialLogin: Bool
+    let prefillName: String
 
     // Step control — sosyal girişte 1 ve 2. adımlar (email, şifre) atlanır
-    @State private var step: Int = 1
+    @State private var step: Int
     private let totalSteps = 19
 
     // DATA
     @State private var email: String = ""
     @State private var password: String = ""
-    @State private var firstName: String = ""
+    @State private var firstName: String
+
+    init(isSocialLogin: Bool = false, prefillName: String = "") {
+        self.isSocialLogin = isSocialLogin
+        self.prefillName = prefillName
+        _step = State(initialValue: isSocialLogin ? 3 : 1)
+        _firstName = State(initialValue: prefillName)
+    }
     @State private var city: String = ""
     @State private var birthday: Date = Calendar.current.date(byAdding: .year, value: -20, to: .now) ?? .now
     @State private var gender: Gender = .male
@@ -116,11 +123,6 @@ struct SignUpFlowView: View {
         .onAppear {
             seedMediaIfNeeded()
             fetchInitialMedia()
-            // Sosyal girişte email+şifre adımlarını atla, ismi doldur
-            if isSocialLogin {
-                step = 3
-                if !prefillName.isEmpty { firstName = prefillName }
-            }
         }
         .onChange(of: pickerItems) { _, newItems in loadSelectedPhotos(newItems) }
         .onChange(of: movieSearchQuery) { _, newValue in

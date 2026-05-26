@@ -142,8 +142,10 @@ struct AuthLandingView: View {
                     Spacer()
 
                     // Switch to Sign Up
-                    NavigationLink(isActive: $navigateToSignUp) {
-                        SignUpFlowView(isSocialLogin: isSocialSignUp, prefillName: socialName)
+                    Button {
+                        isSocialSignUp = false
+                        socialName = ""
+                        navigateToSignUp = true
                     } label: {
                         HStack {
                             Text("Hesabın yok mu?")
@@ -158,6 +160,9 @@ struct AuthLandingView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $navigateToSignUp) {
+            SignUpFlowView(isSocialLogin: isSocialSignUp, prefillName: socialName)
+        }
         }
     }
 
