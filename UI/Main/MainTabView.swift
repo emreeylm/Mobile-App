@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
 
+    @EnvironmentObject var subscriptionStore: AppSubscriptionStore
     @State private var selectedTab: TabItem = .match
     
     init() {
@@ -51,5 +52,19 @@ struct MainTabView: View {
             CustomTabBar(selectedTab: $selectedTab)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .onChange(of: selectedTab) { _, _ in
+            subscriptionStore.recordAppInteraction()
+        }
+        .fullScreenCover(isPresented: $subscriptionStore.showPeriodicPaywall) {
+            PaywallView()
+        }
+        // Push notification deep link — yeni eşleşme
+        .onReceive(NotificationCenter.default.publisher(for: .didReceiveMatchPush)) { _ in
+            selectedTab = .match
+        }
+        // Push notification deep link — yeni mesaj
+        .onReceive(NotificationCenter.default.publisher(for: .didReceiveMessagePush)) { _ in
+            selectedTab = .messages
+        }
     }
 }

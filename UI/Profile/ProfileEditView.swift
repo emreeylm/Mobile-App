@@ -22,9 +22,23 @@ struct ProfileEditView: View {
     @State private var alcoholHabit: String = ""
     @State private var university: String = ""
 
+    // Now Watching
+    @State private var selectedShowName: String = ""
+    @State private var nowWatchingSeason: Int = 1
+    @State private var nowWatchingEpisode: Int = 1
+    @State private var nowWatchingQuery: String = ""
+    @State private var nowWatchingResults: [TMDBSearchResult] = []
+    @State private var isEditingNowWatching: Bool = false
+
+    private var nowWatchingString: String {
+        guard !selectedShowName.isEmpty else { return "" }
+        return "\(selectedShowName) - \(nowWatchingSeason). Sezon \(nowWatchingEpisode). Bölüm"
+    }
+
     // photos
     @State private var photos: [Data] = []
     @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var newlyAddedPhotos: [Data] = []   // sadece bu oturumda eklenenler, backend'e upload edilecek
     
     @State private var showSuccess = false
     @Environment(\.dismiss) private var dismiss
@@ -94,6 +108,7 @@ struct ProfileEditView: View {
                                 
                                 textField("Alkol Kullanımı", text: $alcoholHabit)
                                 textField("Üniversite", text: $university)
+                                nowWatchingSection
 
                                 HStack {
                                     Text("Yaş: \(age)")
@@ -244,7 +259,7 @@ struct ProfileEditView: View {
         Button {
             saveProfile()
         } label: {
-            Text("Dizaynı Kaydet")
+            Text("Profili Kaydet")
                 .font(.system(size: 16, weight: .bold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -253,10 +268,8 @@ struct ProfileEditView: View {
                 .clipShape(Capsule())
                 .shadow(color: AppTheme.accent.opacity(0.2), radius: 10, x: 0, y: 5)
         }
-        .disabled(firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                  lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .opacity((firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                  lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ? 0.6 : 1)
+        .disabled(firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .opacity(firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1)
         .padding(.top, 8)
     }
 
@@ -268,13 +281,14 @@ struct ProfileEditView: View {
                 if photos.count >= maxPhotos { break }
                 if let data = try? await item.loadTransferable(type: Data.self),
                    let uiImage = UIImage(data: data) {
-                    
+
                     // Optimize image: Max 1000px and 0.7 compression
                     let optimizedData = compressImage(uiImage)
-                    
+
                     await MainActor.run {
                         if photos.count < maxPhotos, let finalData = optimizedData {
                             photos.append(finalData)
+                            newlyAddedPhotos.append(finalData)  // yeni fotoğrafları takip et
                         }
                     }
                 }
@@ -304,6 +318,191 @@ struct ProfileEditView: View {
         return resizedImage.jpegData(compressionQuality: 0.7)
     }
 
+    // MARK: - Now Watching Section
+
+    @ViewBuilder
+    private var nowWatchingSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Şu an izlediğim")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(AppTheme.text.opacity(0.6))
+                Spacer()
+                if !selectedShowName.isEmpty && !isEditingNowWatching {
+                    Button("Değiştir") {
+                        withAnimation(.spring(response: 0.3)) {
+                            isEditingNowWatching = true
+                            nowWatchingQuery = ""
+                            nowWatchingResults = []
+                        }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.accent)
+                }
+            }
+
+            if !selectedShowName.isEmpty && !isEditingNowWatching {
+                // Seçili dizi kartı
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "tv.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppTheme.accent)
+                            .frame(width: 40, height: 40)
+                            .background(AppTheme.accent.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(selectedShowName)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(AppTheme.text)
+                            Text("Sezon \(nowWatchingSeason)  •  Bölüm \(nowWatchingEpisode)")
+                                .font(.system(size: 13))
+                                .foregroundColor(AppTheme.text.opacity(0.5))
+                        }
+                        Spacer()
+                        Button {
+                            withAnimation(.spring(response: 0.3)) {
+                                selectedShowName = ""
+                                nowWatchingSeason = 1
+                                nowWatchingEpisode = 1
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(AppTheme.text.opacity(0.35))
+                                .font(.system(size: 20))
+                        }
+                    }
+
+                    // Sezon & Bölüm picker'ları
+                    HStack(spacing: 12) {
+                        VStack(spacing: 4) {
+                            Text("Sezon")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(AppTheme.text.opacity(0.5))
+                            Picker("Sezon", selection: $nowWatchingSeason) {
+                                ForEach(1...30, id: \.self) { Text("\($0)").tag($0) }
+                            }
+                            .pickerStyle(.wheel)
+                            .frame(height: 90)
+                            .clipped()
+                            .preferredColorScheme(.dark)
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        VStack(spacing: 4) {
+                            Text("Bölüm")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(AppTheme.text.opacity(0.5))
+                            Picker("Bölüm", selection: $nowWatchingEpisode) {
+                                ForEach(1...50, id: \.self) { Text("\($0)").tag($0) }
+                            }
+                            .pickerStyle(.wheel)
+                            .frame(height: 90)
+                            .clipped()
+                            .preferredColorScheme(.dark)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(14)
+                .background(AppTheme.text.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.accent.opacity(0.25), lineWidth: 1))
+
+            } else {
+                // Arama alanı
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(AppTheme.text.opacity(0.4))
+                    TextField("Dizi ara...", text: $nowWatchingQuery)
+                        .foregroundColor(AppTheme.text)
+                        .tint(AppTheme.accent)
+                    if !nowWatchingQuery.isEmpty {
+                        Button { nowWatchingQuery = ""; nowWatchingResults = [] } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(AppTheme.text.opacity(0.3))
+                        }
+                    }
+                }
+                .padding()
+                .background(AppTheme.text.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.accent.opacity(0.3), lineWidth: 1))
+                .task(id: nowWatchingQuery) {
+                    guard !nowWatchingQuery.isEmpty else { nowWatchingResults = []; return }
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    guard !Task.isCancelled else { return }
+                    let res = (try? await TMDBService.shared.search(query: nowWatchingQuery, type: .series)) ?? []
+                    nowWatchingResults = Array(res.prefix(6))
+                }
+
+                if !nowWatchingResults.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(nowWatchingResults, id: \.id) { result in
+                            Button {
+                                withAnimation(.spring(response: 0.3)) {
+                                    selectedShowName   = result.displayName
+                                    nowWatchingSeason  = 1
+                                    nowWatchingEpisode = 1
+                                    nowWatchingResults = []
+                                    nowWatchingQuery   = ""
+                                    isEditingNowWatching = false
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    if let url = result.posterURL.flatMap({ URL(string: $0) }) {
+                                        AsyncImage(url: url) { img in
+                                            img.resizable().scaledToFill()
+                                        } placeholder: {
+                                            Rectangle().fill(AppTheme.text.opacity(0.1))
+                                        }
+                                        .frame(width: 36, height: 52)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(AppTheme.text.opacity(0.1))
+                                            .frame(width: 36, height: 52)
+                                    }
+                                    Text(result.displayName)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundColor(AppTheme.text)
+                                        .lineLimit(2)
+                                    Spacer()
+                                    Image(systemName: "plus.circle")
+                                        .foregroundColor(AppTheme.accent)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
+                            if result.id != nowWatchingResults.last?.id {
+                                Divider()
+                                    .background(AppTheme.text.opacity(0.06))
+                                    .padding(.horizontal, 14)
+                            }
+                        }
+                    }
+                    .background(AppTheme.text.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+
+                if isEditingNowWatching {
+                    Button("İptal") {
+                        withAnimation(.spring(response: 0.3)) {
+                            isEditingNowWatching = false
+                            nowWatchingQuery = ""
+                            nowWatchingResults = []
+                        }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.text.opacity(0.5))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
+        }
+    }
+
     private func textField(_ title: String, text: Binding<String>) -> some View {
         TextField(title, text: text)
             .padding()
@@ -328,6 +527,23 @@ struct ProfileEditView: View {
         smokingHabit = profile.smokingHabit
         alcoholHabit = profile.alcoholHabit
         university = profile.university
+        // "Breaking Bad - 1. Sezon 4. Bölüm" formatını parse et
+        let nw = profile.nowWatching
+        if !nw.isEmpty {
+            let parts = nw.components(separatedBy: " - ")
+            if parts.count >= 2 {
+                selectedShowName = parts[0]
+                let detail = parts[1] // "1. Sezon 4. Bölüm"
+                let words = detail.components(separatedBy: " ")
+                // ["1.", "Sezon", "4.", "Bölüm"]
+                if words.count >= 4 {
+                    nowWatchingSeason  = Int(words[0].replacingOccurrences(of: ".", with: "")) ?? 1
+                    nowWatchingEpisode = Int(words[2].replacingOccurrences(of: ".", with: "")) ?? 1
+                }
+            } else {
+                selectedShowName = nw
+            }
+        }
 
         photos = profile.photos
             .sorted(by: { $0.order < $1.order })
@@ -337,7 +553,7 @@ struct ProfileEditView: View {
     private func saveProfile() {
         let fn = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
         let ln = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard fn.isEmpty == false, ln.isEmpty == false else { return }
+        guard fn.isEmpty == false else { return }
 
         if let profile = session.currentProfile {
             // ✅ computed name yok: first/last güncelle
@@ -353,6 +569,7 @@ struct ProfileEditView: View {
             profile.smokingHabit = smokingHabit
             profile.alcoholHabit = alcoholHabit
             profile.university = university
+            profile.nowWatching = nowWatchingString
 
             // ✅ photos relation yeniden yaz
             profile.photos.removeAll()
@@ -364,7 +581,26 @@ struct ProfileEditView: View {
 
             try? modelContext.save()
             session.setCurrentProfile(profile)
-            
+
+            // Backend'e gönder (fire-and-forget; auth yoksa sessizce geçilir)
+            let photosToUpload = newlyAddedPhotos
+            newlyAddedPhotos.removeAll()
+            Task {
+                let req = UpdateUserRequest(
+                    isim: fn,
+                    yas: age,
+                    cinsiyet: gender.rawValue,
+                    hedef_cinsiyet: lookingFor.rawValue,
+                    now_watching: nowWatchingString.isEmpty ? nil : nowWatchingString
+                )
+                _ = try? await APIClient.shared.updateMe(req)
+                // Yeni eklenen fotoğrafları backend'e yükle
+                for photoData in photosToUpload {
+                    _ = try? await APIClient.shared.uploadPhoto(data: photoData, mimeType: "image/jpeg")
+                }
+                await session.fetchBackendUser()
+            }
+
             showSuccess = true
 
         } else {
@@ -375,7 +611,6 @@ struct ProfileEditView: View {
                 ownerUserId: ownerId,
                 firstName: fn,
                 lastName: ln,
-                age: age,
                 city: city,
                 jobTitle: jobTitle,
                 bio: bio,

@@ -5,16 +5,23 @@ struct ProfilePreviewView: View {
 
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var session: SessionStore
+    @EnvironmentObject var subscriptionStore: AppSubscriptionStore
     @Query private var mediaItems: [MediaItem]
     @Query private var profileMedia: [ProfileMedia]
 
     var profile: Profile? // Optional: show specific profile
-    
+
+    @State private var showAllMovies = false
+    @State private var showAllSeries = false
+    @State private var showVipSheet = false
+    @State private var vipMessage = ""
+    @State private var vipSent = false
+    @State private var vipError = false
+    @State private var showPaywall = false
+
     private var displayProfile: Profile? {
         profile ?? session.currentProfile
     }
-
-    @State private var showSignOut = false
 
     var body: some View {
         ZStack {
@@ -49,6 +56,11 @@ struct ProfilePreviewView: View {
                             mediaListSection(profile: p, type: .movie, title: "FİLMLERİM")
                             mediaListSection(profile: p, type: .series, title: "DİZİLERİM")
 
+                            // 8. VIP send button (başkasının profili)
+                            if p.id != session.currentProfile?.id {
+                                vipSendButton(profile: p)
+                            }
+
                             Spacer(minLength: 120) // Tab bar clearance
                         }
                         .padding(.horizontal, 24)
@@ -62,11 +74,24 @@ struct ProfilePreviewView: View {
             }
         }
         .navigationBarHidden(true)
-        .alert("Çıkış Yap", isPresented: $showSignOut) {
-            Button("Çıkış", role: .destructive) { session.signOut() }
-            Button("İptal", role: .cancel) { }
+        .sheet(isPresented: $showVipSheet) {
+            if let p = displayProfile {
+                VIPSendSheet(targetId: p.ownerUserId, message: $vipMessage,
+                             isPresented: $showVipSheet, onSent: { vipSent = true })
+            }
+        }
+        .alert("VIP Mesaj Gönderildi", isPresented: $vipSent) {
+            Button("Tamam", role: .cancel) {}
         } message: {
-            Text("Hesabından çıkış yapmak istediğine emin misin?")
+            Text("Mesajın karşı tarafa iletildi.")
+        }
+        .alert("Hata", isPresented: $vipError) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text("VIP bilet gönderilemedi. Bilet bakiyeni kontrol et.")
+        }
+        .fullScreenCover(isPresented: $showPaywall) {
+            PaywallView()
         }
     }
 
@@ -88,22 +113,30 @@ struct ProfilePreviewView: View {
             Spacer()
 
             if isMe {
-                Menu {
-                    NavigationLink("Profili Düzenle") {
+                HStack(spacing: 10) {
+                    NavigationLink {
                         ProfileEditView()
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(AppTheme.text)
+                            .frame(width: 44, height: 44)
+                            .background(AppTheme.text.opacity(0.05))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(AppTheme.text.opacity(0.08), lineWidth: 1))
                     }
-                    Button("Çıkış Yap", role: .destructive) {
-                        showSignOut = true
+
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(AppTheme.text)
+                            .frame(width: 44, height: 44)
+                            .background(AppTheme.text.opacity(0.05))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(AppTheme.text.opacity(0.08), lineWidth: 1))
                     }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(AppTheme.text)
-                        .frame(width: 44, height: 44)
-                        .background(AppTheme.text.opacity(0.05))
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
-                        .contentShape(Rectangle()) // ✅ Improves touch area reliability
                 }
             }
         }
@@ -111,30 +144,35 @@ struct ProfilePreviewView: View {
     }
 
     private func mainImageView(profile: Profile) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            if let photoData = profile.photos.sorted(by: { $0.order < $1.order }).first?.data,
-               let uiImage = UIImage(data: photoData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: UIScreen.main.bounds.width - 48, height: UIScreen.main.bounds.width - 48)
-                    .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 32)
-                            .stroke(AppTheme.text.opacity(0.1), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
-            } else {
-                RoundedRectangle(cornerRadius: 32)
-                    .fill(AppTheme.text.opacity(0.05))
-                    .frame(width: UIScreen.main.bounds.width - 48, height: UIScreen.main.bounds.width - 48)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 80))
-                            .foregroundStyle(AppTheme.text.opacity(0.2))
-                    )
+        GeometryReader { geo in
+            let imageSize = geo.size.width
+            ZStack(alignment: .bottomTrailing) {
+                if let photoData = profile.photos.sorted(by: { $0.order < $1.order }).first?.data,
+                   let uiImage = UIImage(data: photoData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: imageSize, height: imageSize)
+                        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 32)
+                                .stroke(AppTheme.text.opacity(0.1), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                } else {
+                    RoundedRectangle(cornerRadius: 32)
+                        .fill(AppTheme.text.opacity(0.05))
+                        .frame(width: imageSize, height: imageSize)
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 80))
+                                .foregroundStyle(AppTheme.text.opacity(0.2))
+                        )
+                }
             }
+            .frame(width: imageSize, height: imageSize)
         }
+        .aspectRatio(1, contentMode: .fit)
     }
 
 
@@ -146,10 +184,27 @@ struct ProfilePreviewView: View {
                     .foregroundColor(AppTheme.text)
             }
 
-            HStack(spacing: 6) {
-                Text(profile.city)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppTheme.text.opacity(0.6))
+            if !profile.nowWatching.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "tv.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.accent)
+                    Text(profile.nowWatching)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppTheme.accent)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(AppTheme.accent.opacity(0.1))
+                .clipShape(Capsule())
+            }
+
+            if !profile.city.isEmpty {
+                HStack(spacing: 6) {
+                    Text(profile.city)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppTheme.text.opacity(0.6))
+                }
             }
         }
     }
@@ -262,6 +317,8 @@ struct ProfilePreviewView: View {
         let list = mediaItems
             .filter { $0.type == type && ids.contains($0.id) }
             .sorted { $0.title < $1.title }
+        let showAll = type == .movie ? showAllMovies : showAllSeries
+        let displayList = showAll ? list : Array(list.prefix(5))
 
         return VStack(alignment: .leading, spacing: 12) {
             Text(title)
@@ -275,7 +332,7 @@ struct ProfilePreviewView: View {
                     .foregroundColor(AppTheme.text.opacity(0.3))
             } else {
                 VStack(spacing: 8) {
-                    ForEach(list, id: \.id) { item in
+                    ForEach(displayList, id: \.id) { item in
                         HStack(spacing: 12) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 10)
@@ -286,16 +343,13 @@ struct ProfilePreviewView: View {
                                     AsyncImage(url: url) { phase in
                                         switch phase {
                                         case .success(let image):
-                                            image.resizable()
-                                                 .scaledToFill()
+                                            image.resizable().scaledToFill()
                                         case .failure(_):
                                             Image(systemName: "photo.on.rectangle.angled")
                                                 .font(.system(size: 14))
                                                 .foregroundColor(AppTheme.text.opacity(0.3))
                                         case .empty:
-                                            ProgressView()
-                                                .tint(AppTheme.accent)
-                                                .scaleEffect(0.6)
+                                            ProgressView().tint(AppTheme.accent).scaleEffect(0.6)
                                         @unknown default:
                                             EmptyView()
                                         }
@@ -308,29 +362,152 @@ struct ProfilePreviewView: View {
                                         .foregroundColor(AppTheme.text.opacity(0.3))
                                 }
                             }
-                            
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.title)
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundColor(AppTheme.text)
-                                
                                 Text(type == .movie ? "Film" : "Dizi")
                                     .font(.system(size: 11))
                                     .foregroundColor(AppTheme.text.opacity(0.5))
                             }
-                            
                             Spacer()
                         }
                         .padding(8)
                         .background(AppTheme.text.opacity(0.03))
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(AppTheme.text.opacity(0.05), lineWidth: 1)
-                        )
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.text.opacity(0.05), lineWidth: 1))
                     }
                 }
+
+                if list.count > 5 {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            if type == .movie { showAllMovies.toggle() }
+                            else { showAllSeries.toggle() }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(showAll ? "Daha az göster" : "\(list.count - 5) tane daha")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppTheme.accent)
+                            Image(systemName: showAll ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(AppTheme.accent)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(AppTheme.accent.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
+        }
+    }
+
+    private func vipSendButton(profile: Profile) -> some View {
+        Button {
+            guard subscriptionStore.consumeSuperLike() else {
+                showPaywall = true
+                return
+            }
+            vipMessage = ""
+            showVipSheet = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "envelope.badge.fill")
+                    .font(.system(size: 16))
+                Text("VIP Mesaj Gönder")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(Color(hex: "0F172A"))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(AppTheme.accent)
+            .clipShape(Capsule())
+            .shadow(color: AppTheme.accent.opacity(0.3), radius: 10, y: 4)
+        }
+    }
+}
+
+// MARK: - VIP Send Sheet
+
+private struct VIPSendSheet: View {
+    let targetId: String
+    @Binding var message: String
+    @Binding var isPresented: Bool
+    let onSent: () -> Void
+
+    @State private var isSending = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AppTheme.background.ignoresSafeArea()
+                VStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Mesajın (opsiyonel)")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AppTheme.text.opacity(0.6))
+                        TextEditor(text: $message)
+                            .frame(height: 120)
+                            .padding(12)
+                            .scrollContentBackground(.hidden)
+                            .background(AppTheme.text.opacity(0.05))
+                            .foregroundStyle(AppTheme.text)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
+                    }
+                    if let err = errorMessage {
+                        Text(err)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                    Button {
+                        Task { await send() }
+                    } label: {
+                        Group {
+                            if isSending {
+                                ProgressView().tint(Color(hex: "0F172A"))
+                            } else {
+                                Text("Gönder")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundStyle(Color(hex: "0F172A"))
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(AppTheme.accent)
+                        .clipShape(Capsule())
+                    }
+                    .disabled(isSending)
+                }
+                .padding(24)
+            }
+            .navigationTitle("VIP Mesaj")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Vazgeç") { isPresented = false }
+                        .foregroundStyle(AppTheme.text)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func send() async {
+        isSending = true
+        defer { isSending = false }
+        let msg = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            _ = try await APIClient.shared.sendVipTicket(toId: targetId, message: msg.isEmpty ? nil : msg)
+            isPresented = false
+            onSent()
+        } catch {
+            errorMessage = "VIP bilet gönderilemedi. Bilet bakiyeni kontrol et."
         }
     }
 }

@@ -34,15 +34,17 @@ struct CustomTabBar: View {
                         Image(systemName: tab.rawValue)
                             .font(.system(size: 24, weight: selectedTab == tab ? .bold : .regular))
                             .scaleEffect(selectedTab == tab ? 1.2 : 1.0)
-                        
-                        if selectedTab == tab {
-                            Circle()
-                                .fill(AppTheme.accent)
-                                .frame(width: 4, height: 4)
-                                .matchedGeometryEffect(id: "tab_dot", in: namespace)
-                        }
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedTab)
+
+                        Circle()
+                            .fill(AppTheme.accent)
+                            .frame(width: 4, height: 4)
+                            .opacity(selectedTab == tab ? 1 : 0)
+                            .scaleEffect(selectedTab == tab ? 1 : 0.1)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: selectedTab)
                     }
                     .foregroundColor(selectedTab == tab ? AppTheme.accent : AppTheme.text.opacity(0.3))
+                    .animation(.easeInOut(duration: 0.2), value: selectedTab)
                 }
                 Spacer()
             }
@@ -67,5 +69,4 @@ struct CustomTabBar: View {
         .padding(.horizontal)
     }
     
-    @Namespace private var namespace
 }

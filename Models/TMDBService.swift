@@ -35,8 +35,18 @@ struct TMDBResponse: Codable {
 
 class TMDBService {
     static let shared = TMDBService()
-    // Using API Key (v3 auth) provided by user
-    private let apiKey = "b4ff215cd5e7eb31939788e97cac1488"
+
+    /// API key'i Info.plist'ten okur.
+    /// Xcode scheme / .xcconfig → `TMDB_API_KEY=<key>` ile tanımlanmalı,
+    /// Info.plist'e `<key>TMDB_API_KEY</key><string>$(TMDB_API_KEY)</string>` eklenmelidir.
+    private let apiKey: String = {
+        if let key = Bundle.main.infoDictionary?["TMDB_API_KEY"] as? String, !key.isEmpty {
+            return key
+        }
+        // Fallback: hardcode (geliştirme ortamı için; üretimde Info.plist kullanın)
+        return "b4ff215cd5e7eb31939788e97cac1488"
+    }()
+
     private let baseURL = "https://api.themoviedb.org/3"
     
     private let decoder: JSONDecoder = {
@@ -78,6 +88,16 @@ class TMDBService {
         }
     }
     
+    /// Film ve dizi aramasını paralel çalıştırır, sonuçları birleştirir.
+    func searchAll(query: String) async throws -> [TMDBSearchResult] {
+        guard !query.isEmpty else { return [] }
+        async let movies = search(query: query, type: .movie)
+        async let series = search(query: query, type: .series)
+        let (m, s) = try await (movies, series)
+        // Önce diziler, sonra filmler; toplamda 6 sonuç
+        return Array((s + m).prefix(6))
+    }
+
     func fetchPopular(type: MediaType) async throws -> [TMDBSearchResult] {
         let endpoint = type == .movie ? "/movie/popular" : "/tv/popular"
         guard var components = URLComponents(string: baseURL + endpoint) else {

@@ -47,6 +47,11 @@ final class Profile {
     var alcoholHabit: String = "Söylemek istemiyorum"
     var university: String = ""
     var interests: [String] = []
+    var nowWatching: String = ""
+
+    /// Backend'den gelen profil fotoğrafı URL'si (S3 veya TMDB poster).
+    /// Yerel fotoğraf varsa bu alan görmezden gelinir.
+    var remotePhotoURL: String? = nil
 
     @Relationship(deleteRule: .cascade) var photos: [ProfilePhoto] = []
     
@@ -58,7 +63,6 @@ final class Profile {
         ownerUserId: String,
         firstName: String,
         lastName: String,
-        age: Int = 18,
         city: String = "",
         jobTitle: String = "Belirtilmedi",
         bio: String,
@@ -71,13 +75,14 @@ final class Profile {
         smokingHabit: String = "Söylemek istemiyorum",
         alcoholHabit: String = "Söylemek istemiyorum",
         university: String = "",
-        interests: [String] = []
+        interests: [String] = [],
+        nowWatching: String = "",
+        remotePhotoURL: String? = nil
     ) {
         self.id = UUID().uuidString
         self.ownerUserId = ownerUserId
         self.firstName = firstName
         self.lastName = lastName
-        self.age = 18 // Default age if birthday is missing
         self.city = city
         self.jobTitle = jobTitle
         self.bio = bio
@@ -91,6 +96,15 @@ final class Profile {
         self.alcoholHabit = alcoholHabit
         self.university = university
         self.interests = interests
+        self.nowWatching = nowWatching
+        self.remotePhotoURL = remotePhotoURL
+
+        // Calculate age once at init
+        if let bday = birthday {
+            self.age = Calendar.current.dateComponents([.year], from: bday, to: .now).year ?? 18
+        } else {
+            self.age = 18
+        }
     }
 
     var calculatedAge: Int {
@@ -248,12 +262,14 @@ final class ChatMessage: Identifiable {
     var imageData: Data?
     var createdAt: Date
     var isRead: Bool
+    /// Backend'den gelen mesaj ID'si (String). "" = sadece yerel mesaj.
+    var remoteIdStr: String = ""
 
     init(
-        threadId: String, 
-        senderProfileId: String, 
-        text: String = "", 
-        imageData: Data? = nil, 
+        threadId: String,
+        senderProfileId: String,
+        text: String = "",
+        imageData: Data? = nil,
         isRead: Bool = false
     ) {
         self.id = UUID().uuidString
@@ -263,5 +279,6 @@ final class ChatMessage: Identifiable {
         self.imageData = imageData
         self.createdAt = .now
         self.isRead = isRead
+        self.remoteIdStr = ""
     }
 }
