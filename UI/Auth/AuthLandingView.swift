@@ -161,7 +161,11 @@ struct AuthLandingView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $navigateToSignUp) {
-            SignUpFlowView(isSocialLogin: isSocialSignUp, prefillName: socialName)
+            SignUpFlowView(
+                isSocialLogin: isSocialSignUp,
+                prefillName: socialName,
+                onBack: { navigateToSignUp = false }
+            )
         }
         }
     }

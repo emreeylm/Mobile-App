@@ -11,6 +11,8 @@ struct SignUpFlowView: View {
     // Sosyal giriş (Google/Apple) ile gelindiyse email+şifre adımları atlanır
     let isSocialLogin: Bool
     let prefillName: String
+    /// İlk adımda geri butonuna basılınca çağrılır (nil ise @Environment dismiss kullanılır)
+    var onBack: (() -> Void)? = nil
 
     // Step control — sosyal girişte 1 ve 2. adımlar (email, şifre) atlanır
     @State private var step: Int
@@ -21,9 +23,10 @@ struct SignUpFlowView: View {
     @State private var password: String = ""
     @State private var firstName: String
 
-    init(isSocialLogin: Bool = false, prefillName: String = "") {
+    init(isSocialLogin: Bool = false, prefillName: String = "", onBack: (() -> Void)? = nil) {
         self.isSocialLogin = isSocialLogin
         self.prefillName = prefillName
+        self.onBack = onBack
         _step = State(initialValue: isSocialLogin ? 3 : 1)
         _firstName = State(initialValue: prefillName)
     }
@@ -146,7 +149,8 @@ struct SignUpFlowView: View {
                         // Sosyal girişte ilk adımda geri → oturumu kapat, giriş sayfasına dön
                         session.signOut()
                     } else {
-                        dismiss()
+                        // onBack varsa onu çağır (AuthLandingView binding'ini sıfırlar), yoksa dismiss
+                        if let onBack { onBack() } else { dismiss() }
                     }
                 } label: {
                     Image(systemName: "arrow.left")
