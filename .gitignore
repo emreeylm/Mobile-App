@@ -29,3 +29,12 @@ Frameworks/
 
 ## Root-level user settings
 DateApp.xcodeproj/xcuserdata/
+
+## Backend — Python
+backend/.env
+backend/.venv/
+backend/venv/
+backend/**/__pycache__/
+backend/*.pyc
+backend/uvicorn.log
+backend/.pytest_cache/

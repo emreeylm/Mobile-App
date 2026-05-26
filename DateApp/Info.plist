@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BINGE_DATE_AD_UNIT_ID</key>
+	<string>$(BINGE_DATE_AD_UNIT_ID)</string>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~3347511713</string>
+	<key>TMDB_API_KEY</key>
+	<string>$(TMDB_API_KEY)</string>
+	<key>BINGE_DATE_API_URL</key>
+	<string>$(BINGE_DATE_API_URL)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Yerel geliştirme için HTTP'ye izin (sadece lokal IP'ler) -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<!-- Production HTTPS kullanır, ek istisnaya gerek yok -->
+	</dict>
+</dict>
+</plist>
