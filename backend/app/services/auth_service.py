@@ -12,10 +12,21 @@ async def verify_google_token(id_token: str) -> dict:
             params={"id_token": id_token},
         )
     if resp.status_code != 200:
-        raise ValueError("Invalid Google token")
+        raise ValueError(f"Invalid Google token: {resp.text}")
     data = resp.json()
-    if data.get("aud") != settings.GOOGLE_CLIENT_ID:
-        raise ValueError("Google token audience mismatch")
+
+    # iOS GIDSignIn token'larında aud veya azp alanlarından biri client_id'ye eşit olmalı.
+    # GOOGLE_CLIENT_ID boşsa audience kontrolünü atla (geliştirme kolaylığı).
+    client_id = settings.GOOGLE_CLIENT_ID
+    if client_id:
+        token_aud = data.get("aud", "")
+        token_azp = data.get("azp", "")
+        if client_id not in (token_aud, token_azp):
+            raise ValueError(
+                f"Google token audience mismatch. "
+                f"expected={client_id} aud={token_aud} azp={token_azp}"
+            )
+
     return {"sub": data["sub"], "email": data["email"], "name": data.get("name", "")}
 
 

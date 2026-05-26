@@ -10,12 +10,27 @@
 	<string>$(TMDB_API_KEY)</string>
 	<key>BINGE_DATE_API_URL</key>
 	<string>$(BINGE_DATE_API_URL)</string>
+
+	<!-- Google Sign-In -->
+	<key>GIDClientID</key>
+	<string>900772945104-qjlpmeh88mahtkimq3otg2n5ousuopb4.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.900772945104-qjlpmeh88mahtkimq3otg2n5ousuopb4</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- Yerel geliştirme için HTTP'ye izin -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- Yerel geliştirme için HTTP'ye izin (sadece lokal IP'ler) -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
-		<!-- Production HTTPS kullanır, ek istisnaya gerek yok -->
 	</dict>
 </dict>
 </plist>

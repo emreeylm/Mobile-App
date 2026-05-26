@@ -10,12 +10,13 @@ struct SignUpFlowView: View {
 
     // Step control
     @State private var step: Int = 1
-    private let totalSteps = 16
+    private let totalSteps = 19
 
     // DATA
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var firstName: String = ""
+    @State private var city: String = ""
     @State private var birthday: Date = Calendar.current.date(byAdding: .year, value: -20, to: .now) ?? .now
     @State private var gender: Gender = .male
     @State private var lookingFor: LookingForGender = .everyone
@@ -45,15 +46,25 @@ struct SignUpFlowView: View {
     @State private var alcoholHabit: String = "Söylemek istemiyorum"
     @State private var university: String = ""
 
+    // NOW WATCHING
+    @State private var nowWatchingQuery: String = ""
+    @State private var nowWatchingResults: [TMDBSearchResult] = []
+    @State private var selectedNowWatching: TMDBSearchResult? = nil
+    @State private var nowWatchingSeason: Int = 1
+    @State private var nowWatchingEpisode: Int = 1
+    @State private var nowWatchingSearchTask: Task<Void, Never>? = nil
+
     @Query private var mediaItems: [MediaItem]
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var isSubmitting = false
 
     private let minPhotos = 2
     private let maxPhotos = 6
     private let minSelection = 5 // Filmler ve Diziler için 5
     private let minGenres = 3    // Türler için 3
-    private let minInterests = 5 // İlgi alanları için 5
+    private let minInterests = 3  // İlgi alanları için en az 3
+    private let maxInterests = 10 // İlgi alanları için en fazla 10
 
     var body: some View {
         ZStack {
@@ -69,19 +80,22 @@ struct SignUpFlowView: View {
                     case 1: emailStep
                     case 2: passwordStep
                     case 3: nameStep
-                    case 4: photoStep
-                    case 5: birthdayStep
-                    case 6: genderStep
-                    case 7: lookingForStep
-                    case 8: movieStep
-                    case 9: seriesStep
-                    case 10: genreStep
-                    case 11: interestStep
-                    case 12: heightStep
-                    case 13: aboutStep
-                    case 14: smokingStep
-                    case 15: alcoholStep
-                    case 16: universityStep
+                    case 4: cityStep
+                    case 5: locationStep
+                    case 6: photoStep
+                    case 7: birthdayStep
+                    case 8: genderStep
+                    case 9: lookingForStep
+                    case 10: movieStep
+                    case 11: seriesStep
+                    case 12: genreStep
+                    case 13: interestStep
+                    case 14: heightStep
+                    case 15: aboutStep
+                    case 16: smokingStep
+                    case 17: alcoholStep
+                    case 18: universityStep
+                    case 19: nowWatchingStep
                     default: EmptyView()
                     }
                 }
@@ -125,7 +139,7 @@ struct SignUpFlowView: View {
                 Spacer()
                 
                 // Atla (Skip) Button for specific steps
-                if [12, 13, 14, 15, 16].contains(step) {
+                if [14, 15, 16, 17, 18, 19].contains(step) {
                     Button("Atla") {
                         withAnimation {
                             if step == totalSteps { finishSignUp() }
@@ -134,6 +148,7 @@ struct SignUpFlowView: View {
                     }
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(AppTheme.text.opacity(0.6))
+                    .disabled(step == totalSteps && isSubmitting)
                 }
             }
             .frame(height: 44)
@@ -244,7 +259,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if photos.count >= minPhotos { withAnimation { step = 5 } }
+            if photos.count >= minPhotos { withAnimation { step = 7 } }
             else { fail("Lütfen en az \(minPhotos) fotoğraf yükleyin.") }
         }
     }
@@ -260,7 +275,7 @@ struct SignUpFlowView: View {
                 .preferredColorScheme(.dark)
                 .colorMultiply(.white) // Ensure white text on dark bg
         } nextAction: {
-            withAnimation { step = 6 }
+            withAnimation { step = 8 }
         }
     }
 
@@ -277,7 +292,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 7 }
+            withAnimation { step = 9 }
         }
     }
 
@@ -292,13 +307,12 @@ struct SignUpFlowView: View {
                 selectionRow(title: "Erkekler", isSelected: lookingFor == .male) { lookingFor = .male }
             }
         } nextAction: {
-            withAnimation { step = 8 }
+            withAnimation { step = 10 }
         }
     }
 
     private var movieStep: some View {
-        let movies = mediaItems.filter { $0.type == .movie }.sorted(by: { $0.title < $1.title })
-        return stepContainer(
+        stepContainer(
             title: "Favori filmlerini seç",
             subtitle: "Sinema zevkini yansıtan en az \(minSelection) film seç."
         ) {
@@ -340,7 +354,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedMovieIds.count >= minSelection { withAnimation { step = 9 } }
+            if selectedMovieIds.count >= minSelection { withAnimation { step = 11 } }
             else { fail("Lütfen en az \(minSelection) film seçin.") }
         }
         .onAppear {
@@ -349,8 +363,7 @@ struct SignUpFlowView: View {
     }
 
     private var seriesStep: some View {
-        let series = mediaItems.filter { $0.type == .series }.sorted(by: { $0.title < $1.title })
-        return stepContainer(
+        stepContainer(
             title: "Favori dizilerini seç",
             subtitle: "Zevkine uygun en az \(minSelection) dizi seç."
         ) {
@@ -392,8 +405,16 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedSeriesIds.count >= minSelection { withAnimation { step = 10 } }
-            else { fail("Lütfen en az \(minSelection) dizi seçin.") }
+            if selectedSeriesIds.count >= minSelection {
+                let total = selectedMovieIds.count + selectedSeriesIds.count
+                if total > 20 {
+                    fail("Seçilen film ve dizi toplamı en fazla 20 olabilir. Şu an: \(total)")
+                } else {
+                    withAnimation { step = 12 }
+                }
+            } else {
+                fail("Lütfen en az \(minSelection) dizi seçin.")
+            }
         }
         .onAppear {
             if seriesSearchResults.isEmpty { fetchInitialMedia() }
@@ -404,7 +425,7 @@ struct SignUpFlowView: View {
         let allGenres = ["Aksiyon","Komedi","Dram","Gerilim","Bilim Kurgu","Romantik","Korku","Gizem","Suç","Fantastik","Macera","Animasyon"]
         return stepContainer(
             title: "Sevdiğin türler",
-            subtitle: "İlgini çeken en az \(minSelection) tür seç."
+            subtitle: "İlgini çeken en az \(minGenres) tür seç."
         ) {
             FlowLayout(items: allGenres) { genre in
                 let isSelected = selectedGenres.contains(genre)
@@ -423,21 +444,59 @@ struct SignUpFlowView: View {
                 )
             }
         } nextAction: {
-            if selectedGenres.count >= minGenres { withAnimation { step = 11 } }
+            if selectedGenres.count >= minGenres { withAnimation { step = 13 } }
             else { fail("Lütfen en az \(minGenres) tür seçin.") }
         }
     }
 
     private var interestStep: some View {
         let sections: [(String, [(String, String)])] = [
-            ("Yiyecek & İçecek", [("🍷 Şarap", "🍷 Şarap"), ("🍕 Pizza", "🍕 Pizza"), ("🥩 Et", "🥩 Et"), ("☕️ Kahve", "☕️ Kahve"), ("🌿 Vegan", "🌿 Vegan")]),
-            ("Ev", [("🍳 Yemek Yapma", "🍳 Yemek Yapma"), ("🎮 Oyun", "🎮 Oyun"), ("🎲 Kutu Oyunları", "🎲 Kutu Oyunları")]),
-            ("Müzik", [("🎸 Gitar", "🎸 Gitar"), ("🎧 DJ'lik", "🎧 DJ'lik"), ("🎹 Piyano", "🎹 Piyano")])
+            ("Yiyecek & İçecek", [
+                ("🍷 Şarap", "🍷 Şarap"), ("🍕 Pizza", "🍕 Pizza"), ("🥩 Et Yemekleri", "🥩 Et Yemekleri"),
+                ("☕️ Kahve", "☕️ Kahve"), ("🌿 Vegan", "🌿 Vegan"), ("🍣 Sushi", "🍣 Sushi"),
+                ("🍺 Bira", "🍺 Bira"), ("🥗 Salata", "🥗 Salata"), ("🍰 Pastane", "🍰 Pastane"),
+                ("🌶️ Acılı Yemekler", "🌶️ Acılı Yemekler"), ("🥘 Ev Yemekleri", "🥘 Ev Yemekleri"),
+                ("🧃 Smoothie", "🧃 Smoothie")
+            ]),
+            ("Spor & Aktivite", [
+                ("🏋️ Spor Salonu", "🏋️ Spor Salonu"), ("🧘 Yoga", "🧘 Yoga"), ("🚴 Bisiklet", "🚴 Bisiklet"),
+                ("🏊 Yüzme", "🏊 Yüzme"), ("⚽️ Futbol", "⚽️ Futbol"), ("🎾 Tenis", "🎾 Tenis"),
+                ("🧗 Tırmanma", "🧗 Tırmanma"), ("🏃 Koşu", "🏃 Koşu"), ("🥊 Boks", "🥊 Boks"),
+                ("🎿 Kayak", "🎿 Kayak"), ("🏄 Sörf", "🏄 Sörf")
+            ]),
+            ("Teknoloji & Oyun", [
+                ("🎮 Video Oyunları", "🎮 Video Oyunları"), ("🎲 Kutu Oyunları", "🎲 Kutu Oyunları"),
+                ("💻 Kodlama", "💻 Kodlama"), ("📱 Sosyal Medya", "📱 Sosyal Medya"),
+                ("🤖 Yapay Zeka", "🤖 Yapay Zeka"), ("📸 Fotoğrafçılık", "📸 Fotoğrafçılık"),
+                ("🎧 Podcast", "🎧 Podcast"), ("🕹️ Retro Oyunlar", "🕹️ Retro Oyunlar")
+            ]),
+            ("Müzik", [
+                ("🎸 Gitar", "🎸 Gitar"), ("🎹 Piyano", "🎹 Piyano"), ("🎧 DJ'lik", "🎧 DJ'lik"),
+                ("🎤 Şarkı Söyleme", "🎤 Şarkı Söyleme"), ("🎺 Caz", "🎺 Caz"),
+                ("🎻 Klasik Müzik", "🎻 Klasik Müzik"), ("🎵 Hip-Hop", "🎵 Hip-Hop"),
+                ("🎶 Indie", "🎶 Indie"), ("🥁 Davul", "🥁 Davul")
+            ]),
+            ("Sanat & Kültür", [
+                ("🎨 Resim", "🎨 Resim"), ("✍️ Yazarlık", "✍️ Yazarlık"), ("📚 Kitap", "📚 Kitap"),
+                ("🎭 Tiyatro", "🎭 Tiyatro"), ("🎬 Sinema", "🎬 Sinema"), ("🖼️ Müze", "🖼️ Müze"),
+                ("🎪 Festival", "🎪 Festival"), ("🕺 Dans", "🕺 Dans"), ("📖 Şiir", "📖 Şiir")
+            ]),
+            ("Doğa & Seyahat", [
+                ("🏕️ Kamp", "🏕️ Kamp"), ("🥾 Yürüyüş", "🥾 Yürüyüş"), ("✈️ Seyahat", "✈️ Seyahat"),
+                ("🌊 Deniz", "🌊 Deniz"), ("⛰️ Dağ", "⛰️ Dağ"), ("🌸 Botanik", "🌸 Botanik"),
+                ("🐾 Hayvanlar", "🐾 Hayvanlar"), ("🌅 Gün Batımı", "🌅 Gün Batımı")
+            ]),
+            ("Yaşam Tarzı", [
+                ("🧸 Minimalizm", "🧸 Minimalizm"), ("♻️ Sürdürülebilirlik", "♻️ Sürdürülebilirlik"),
+                ("🏠 İç Tasarım", "🏠 İç Tasarım"), ("💆 Meditasyon", "💆 Meditasyon"),
+                ("🌙 Gece Hayatı", "🌙 Gece Hayatı"), ("🌱 Bahçecilik", "🌱 Bahçecilik"),
+                ("🛍️ Moda", "🛍️ Moda"), ("💊 Wellness", "💊 Wellness")
+            ])
         ]
         
         return stepContainer(
             title: "İlgi alanların",
-            subtitle: "Seni anlatan en az \(minInterests) başlık seç."
+            subtitle: "Seni anlatan \(minInterests)–\(maxInterests) başlık seç."
         ) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -454,8 +513,11 @@ struct SignUpFlowView: View {
                                         .foregroundColor(isSelected ? .black : AppTheme.text)
                                         .clipShape(RoundedRectangle(cornerRadius: 12))
                                         .onTapGesture {
-                                            if isSelected { selectedInterests.remove(item) }
-                                            else { selectedInterests.insert(item) }
+                                            if isSelected {
+                                                selectedInterests.remove(item)
+                                            } else if selectedInterests.count < maxInterests {
+                                                selectedInterests.insert(item)
+                                            }
                                         }
                                 )
                             }
@@ -464,8 +526,8 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedInterests.count >= minInterests { withAnimation { step = 12 } }
-            else { fail("Lütfen en az \(minInterests) ilgi alanı seçin.") }
+            if selectedInterests.count >= minInterests { withAnimation { step = 14 } }
+            else { fail("Lütfen en az \(minInterests) ilgi alanı seçin. (maks \(maxInterests))") }
         }
     }
 
@@ -501,7 +563,7 @@ struct SignUpFlowView: View {
                 .clipShape(Capsule())
             }
         } nextAction: {
-            withAnimation { step = 13 }
+            withAnimation { step = 15 }
         }
     }
 
@@ -513,6 +575,7 @@ struct SignUpFlowView: View {
             TextEditor(text: $aboutMe)
                 .frame(height: 120)
                 .padding(16)
+                .scrollContentBackground(.hidden)
                 .background(AppTheme.text.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(
@@ -521,7 +584,7 @@ struct SignUpFlowView: View {
                 )
                 .foregroundColor(AppTheme.text)
         } nextAction: {
-            withAnimation { step = 14 }
+            withAnimation { step = 16 }
         }
     }
 
@@ -539,7 +602,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 15 }
+            withAnimation { step = 17 }
         }
     }
 
@@ -557,8 +620,65 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 16 }
+            withAnimation { step = 18 }
         }
+    }
+
+    private var cityStep: some View {
+        stepContainer(
+            title: "Hangi şehirdesin?",
+            subtitle: "Yakınındaki kişilerle eşleştirmek için kullanılır."
+        ) {
+            TextField("Şehir adı", text: $city)
+                .setupTextFieldStyle()
+        } nextAction: {
+            if !city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                withAnimation { step = 5 }
+            } else {
+                fail("Lütfen şehrinizi girin.")
+            }
+        }
+    }
+
+    private var locationStep: some View {
+        stepContainer(
+            title: "Konumuna izin ver",
+            subtitle: "Yakınındaki kişilerle eşleşebilmemiz için konumuna ihtiyacımız var."
+        ) {
+            VStack(spacing: 24) {
+                Image(systemName: "location.circle.fill")
+                    .font(.system(size: 72))
+                    .foregroundStyle(AppTheme.accent)
+                    .padding(.top, 16)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    locationFeatureRow(icon: "person.2.fill",   text: "Yakınındaki kişilerle eşleş")
+                    locationFeatureRow(icon: "slider.horizontal.3", text: "Mesafe filtresiyle özelleştir")
+                    locationFeatureRow(icon: "lock.shield.fill", text: "Konumun asla herkese açık paylaşılmaz")
+                }
+                .padding(.horizontal, 8)
+            }
+            .frame(maxWidth: .infinity)
+        } nextAction: {
+            LocationManager.shared.requestPermission()
+            withAnimation { step = 6 }
+        }
+    }
+
+    private func locationFeatureRow(icon: String, text: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(AppTheme.accent)
+                .frame(width: 28)
+            Text(text)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(AppTheme.text.opacity(0.8))
+            Spacer()
+        }
+        .padding(14)
+        .background(AppTheme.text.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private var universityStep: some View {
@@ -569,19 +689,194 @@ struct SignUpFlowView: View {
             TextField("Üniversite adı", text: $university)
                 .setupTextFieldStyle()
         } nextAction: {
+            withAnimation { step = 19 }
+        }
+    }
+
+    // MARK: - Now Watching Step
+
+    private var nowWatchingStep: some View {
+        stepContainer(
+            title: "Şu an ne izliyorsun? (isteğe bağlı)",
+            subtitle: "İsteğe bağlı — profilinde görünür.",
+            isLoading: isSubmitting
+        ) {
+            VStack(spacing: 16) {
+                // Seçili içerik kartı
+                if let selected = selectedNowWatching {
+                    HStack(spacing: 12) {
+                        if let url = selected.posterURL.flatMap({ URL(string: $0) }) {
+                            AsyncImage(url: url) { img in
+                                img.resizable().scaledToFill()
+                            } placeholder: {
+                                Rectangle().fill(AppTheme.text.opacity(0.1))
+                            }
+                            .frame(width: 50, height: 72)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(selected.displayName)
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(AppTheme.text)
+                            Text("Dizi")
+                                .font(.system(size: 13))
+                                .foregroundColor(AppTheme.text.opacity(0.5))
+                        }
+                        Spacer()
+                        Button {
+                            selectedNowWatching = nil
+                            nowWatchingQuery = ""
+                            nowWatchingResults = []
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(AppTheme.text.opacity(0.4))
+                                .font(.system(size: 20))
+                        }
+                    }
+                    .padding(12)
+                    .background(AppTheme.text.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    // Sezon & Bölüm
+                    if true {
+                        HStack(spacing: 16) {
+                            VStack(spacing: 6) {
+                                Text("Sezon")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(AppTheme.text.opacity(0.6))
+                                Picker("Sezon", selection: $nowWatchingSeason) {
+                                    ForEach(1...30, id: \.self) { s in
+                                        Text("\(s)").tag(s)
+                                    }
+                                }
+                                .pickerStyle(.wheel)
+                                .frame(height: 100)
+                                .clipped()
+                                .preferredColorScheme(.dark)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(AppTheme.text.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                            VStack(spacing: 6) {
+                                Text("Bölüm")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(AppTheme.text.opacity(0.6))
+                                Picker("Bölüm", selection: $nowWatchingEpisode) {
+                                    ForEach(1...50, id: \.self) { e in
+                                        Text("\(e)").tag(e)
+                                    }
+                                }
+                                .pickerStyle(.wheel)
+                                .frame(height: 100)
+                                .clipped()
+                                .preferredColorScheme(.dark)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(AppTheme.text.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                } else {
+                    // Arama alanı
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(AppTheme.text.opacity(0.4))
+                        TextField("Dizi ara...", text: $nowWatchingQuery)
+                            .foregroundColor(AppTheme.text)
+                            .tint(AppTheme.accent)
+                            .onChange(of: nowWatchingQuery) { _, q in
+                                nowWatchingSearchTask?.cancel()
+                                guard !q.isEmpty else { nowWatchingResults = []; return }
+                                nowWatchingSearchTask = Task {
+                                    try? await Task.sleep(nanoseconds: 400_000_000)
+                                    guard !Task.isCancelled else { return }
+                                    let results = (try? await TMDBService.shared.search(query: q, type: .series)) ?? []
+                                    await MainActor.run { nowWatchingResults = Array(results.prefix(6)) }
+                                }
+                            }
+                        if !nowWatchingQuery.isEmpty {
+                            Button { nowWatchingQuery = ""; nowWatchingResults = [] } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(AppTheme.text.opacity(0.3))
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(AppTheme.text.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.accent.opacity(0.3), lineWidth: 1))
+
+                    // Arama sonuçları
+                    if !nowWatchingResults.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(nowWatchingResults, id: \.id) { result in
+                                Button {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        selectedNowWatching = result
+                                        nowWatchingResults = []
+                                        nowWatchingQuery = ""
+                                        nowWatchingSeason = 1
+                                        nowWatchingEpisode = 1
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        if let url = result.posterURL.flatMap({ URL(string: $0) }) {
+                                            AsyncImage(url: url) { img in
+                                                img.resizable().scaledToFill()
+                                            } placeholder: {
+                                                Rectangle().fill(AppTheme.text.opacity(0.1))
+                                            }
+                                            .frame(width: 36, height: 52)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        } else {
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .fill(AppTheme.text.opacity(0.1))
+                                                .frame(width: 36, height: 52)
+                                        }
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(result.displayName)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundColor(AppTheme.text)
+                                                .lineLimit(1)
+                                            Text("Dizi")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(AppTheme.text.opacity(0.5))
+                                        }
+                                        Spacer()
+                                        Image(systemName: "plus.circle")
+                                            .foregroundColor(AppTheme.accent)
+                                    }
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                }
+                                .buttonStyle(.plain)
+                                if result.id != nowWatchingResults.last?.id {
+                                    Divider().background(AppTheme.text.opacity(0.06)).padding(.horizontal, 14)
+                                }
+                            }
+                        }
+                        .background(AppTheme.text.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+            }
+        } nextAction: {
             finishSignUp()
         }
     }
 
     // MARK: - Helpers
 
-    private func stepContainer<Content: View>(title: String, subtitle: String, @ViewBuilder content: @escaping () -> Content, nextAction: @escaping () -> Void) -> some View {
+    private func stepContainer<Content: View>(title: String, subtitle: String, isLoading: Bool = false, @ViewBuilder content: @escaping () -> Content, nextAction: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(title)
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(AppTheme.text)
-                
+
                 Text(subtitle)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(AppTheme.text.opacity(0.5))
@@ -589,16 +884,24 @@ struct SignUpFlowView: View {
             }
             .padding(.horizontal, 24)
             .padding(.top, 40)
-            
+
             content()
                 .padding(.horizontal, 24)
-            
+
             Spacer()
-            
-            Button("Devam Et") { nextAction() }
-                .setupButtonStyle()
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
+
+            Button(action: { nextAction() }) {
+                if isLoading {
+                    ProgressView()
+                        .tint(.black)
+                } else {
+                    Text("Devam Et")
+                }
+            }
+            .setupButtonStyle(disabled: isLoading)
+            .disabled(isLoading)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 40)
         }
     }
 
@@ -768,67 +1071,147 @@ struct SignUpFlowView: View {
     private func loadSelectedPhotos(_ items: [PhotosPickerItem]) {
         Task {
             for item in items {
-                if let data = try? await item.loadTransferable(type: Data.self) {
-                    await MainActor.run { withAnimation { photos.append(data) } }
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    
+                    // Compress and Resize
+                    if let compressedData = compressImage(uiImage) {
+                        await MainActor.run { withAnimation { photos.append(compressedData) } }
+                    }
                 }
             }
+            await MainActor.run { pickerItems = [] }
         }
     }
 
+    private func compressImage(_ image: UIImage) -> Data? {
+        let maxDimension: CGFloat = 1000
+        let size = image.size
+        
+        var newSize = size
+        if size.width > maxDimension || size.height > maxDimension {
+            if size.width > size.height {
+                newSize = CGSize(width: maxDimension, height: size.height * (maxDimension / size.width))
+            } else {
+                newSize = CGSize(width: size.width * (maxDimension / size.height), height: maxDimension)
+            }
+        }
+        
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resizedImage = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        
+        return resizedImage.jpegData(compressionQuality: 0.7)
+    }
+
+    private var nowWatchingString: String {
+        guard let s = selectedNowWatching else { return "" }
+        return "\(s.displayName) - \(nowWatchingSeason). Sezon \(nowWatchingEpisode). Bölüm"
+    }
+
     private func finishSignUp() {
-        session.signUp(email: email, password: password, modelContext: modelContext)
-        guard let uid = session.currentUserId else { return }
-        
-        let profile = Profile(
-            ownerUserId: uid,
-            firstName: firstName,
-            lastName: "",
-            bio: aboutMe,
-            gender: gender,
-            lookingForGender: lookingFor,
-            favoriteMovieGenres: Array(selectedGenres),
-            birthday: birthday,
-            height: "\(heightValue) \(heightUnit)",
-            smokingHabit: smokingHabit,
-            alcoholHabit: alcoholHabit,
-            university: university,
-            interests: Array(selectedInterests)
-        )
-        
-        for (idx, d) in photos.enumerated() {
-            let ph = ProfilePhoto(data: d, order: idx)
-            modelContext.insert(ph)
-            profile.photos.append(ph)
+        guard !isSubmitting else { return }
+        isSubmitting = true
+
+        Task { @MainActor in
+            defer { isSubmitting = false }
+            do {
+                // 1. Kayıt ol ve token al
+                try await session.signUp(email: email, password: password, isim: firstName, modelContext: modelContext)
+                guard let uid = session.currentUserId else { return }
+
+                // 2. Seçilen medyayı backend'e gönder
+                let seriesItems = seriesSearchResults
+                    .filter { selectedSeriesIds.contains("\($0.id)") }
+                    .map { OnboardingMediaItem(id: $0.id, baslik: $0.displayName, tip: "tv", afis_url: $0.posterURL) }
+                let movieItems = movieSearchResults
+                    .filter { selectedMovieIds.contains("\($0.id)") }
+                    .map { OnboardingMediaItem(id: $0.id, baslik: $0.displayName, tip: "movie", afis_url: $0.posterURL) }
+
+                try await APIClient.shared.saveOnboarding(OnboardingRequest(
+                    diziler: seriesItems,
+                    filmler: movieItems,
+                    turler: Array(selectedGenres)
+                ))
+
+                if !nowWatchingString.isEmpty {
+                    _ = try? await APIClient.shared.updateMe(
+                        UpdateUserRequest(now_watching: nowWatchingString)
+                    )
+                }
+
+                // 3. Yerel profili SwiftData'ya kaydet
+                let profile = Profile(
+                    ownerUserId: uid,
+                    firstName: firstName,
+                    lastName: "",
+                    city: city,
+                    bio: aboutMe,
+                    gender: gender,
+                    lookingForGender: lookingFor,
+                    favoriteMovieGenres: Array(selectedGenres),
+                    birthday: birthday,
+                    height: "\(heightValue) \(heightUnit)",
+                    smokingHabit: smokingHabit,
+                    alcoholHabit: alcoholHabit,
+                    university: university,
+                    interests: Array(selectedInterests),
+                    nowWatching: nowWatchingString
+                )
+
+                for (idx, d) in photos.enumerated() {
+                    let ph = ProfilePhoto(data: d, order: idx)
+                    modelContext.insert(ph)
+                    profile.photos.append(ph)
+                }
+
+                modelContext.insert(profile)
+
+                // 4. Fotoğrafları backend'e yükle (fire-and-forget; hata olursa yerel kopya kalır)
+                for photoData in photos {
+                    if let uiImage = UIImage(data: photoData),
+                       let compressed = compressImage(uiImage) {
+                        _ = try? await APIClient.shared.uploadPhoto(data: compressed, mimeType: "image/jpeg")
+                    }
+                }
+
+                for result in movieSearchResults where selectedMovieIds.contains("\(result.id)") {
+                    let item = MediaItem(
+                        title: result.displayName,
+                        type: .movie,
+                        tmdbId: result.id,
+                        posterPath: result.poster_path,
+                        backdropPath: result.backdrop_path
+                    )
+                    modelContext.insert(item)
+                    modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: item.id))
+                }
+                for result in seriesSearchResults where selectedSeriesIds.contains("\(result.id)") {
+                    let item = MediaItem(
+                        title: result.displayName,
+                        type: .series,
+                        tmdbId: result.id,
+                        posterPath: result.poster_path,
+                        backdropPath: result.backdrop_path
+                    )
+                    modelContext.insert(item)
+                    modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: item.id))
+                }
+
+                try? modelContext.save()
+                session.setCurrentProfile(profile)
+
+            } catch let error as APIError {
+                if case .httpError(409, _) = error {
+                    fail("Bu e-posta adresi zaten kullanılıyor.\nGiriş yapmayı deneyin.")
+                } else {
+                    fail(error.localizedDescription ?? "Kayıt sırasında bir hata oluştu.")
+                }
+            } catch {
+                fail(error.localizedDescription)
+            }
         }
-        
-        modelContext.insert(profile)
-        
-        // Save selected media items to SwiftData
-        for result in movieSearchResults where selectedMovieIds.contains("\(result.id)") {
-            let item = MediaItem(
-                title: result.displayName, 
-                type: .movie, 
-                tmdbId: result.id, 
-                posterPath: result.poster_path,
-                backdropPath: result.backdrop_path
-            )
-            modelContext.insert(item)
-            modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: item.id))
-        }
-        for result in seriesSearchResults where selectedSeriesIds.contains("\(result.id)") {
-            let item = MediaItem(
-                title: result.displayName, 
-                type: .series, 
-                tmdbId: result.id, 
-                posterPath: result.poster_path,
-                backdropPath: result.backdrop_path
-            )
-            modelContext.insert(item)
-            modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: item.id))
-        }
-        
-        try? modelContext.save()
-        session.setCurrentProfile(profile)
     }
 
     private func seedMediaIfNeeded() {
