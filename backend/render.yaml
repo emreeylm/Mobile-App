@@ -1,0 +1,67 @@
+services:
+  - type: web
+    name: bingedate-backend
+    env: python
+    region: frankfurt          # EU (KVKK/GDPR için)
+    plan: free                 # Başlangıç için; uyku moduna girebilir → starter'a geç
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+
+    envVars:
+      # --- Supabase PostgreSQL ---
+      - key: DATABASE_URL
+        sync: false            # Render dashboard'dan elle girilecek
+
+      - key: DATABASE_SSL
+        value: "true"          # Supabase SSL zorunlu
+
+      # --- Upstash Redis ---
+      - key: REDIS_URL
+        sync: false            # Render dashboard'dan elle girilecek
+
+      # --- JWT ---
+      - key: JWT_SECRET
+        generateValue: true    # Render otomatik üretir, dokunma
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "15"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "30"
+
+      # --- TMDB ---
+      - key: TMDB_API_KEY
+        sync: false
+
+      # --- Fotoğraf Depolama (Supabase Storage → S3 uyumlu) ---
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: S3_BUCKET
+        sync: false            # Supabase Storage bucket adı
+      - key: S3_REGION
+        value: eu-west-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false            # Supabase → Settings → API → service_role key
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false            # Supabase Storage S3 secret
+      - key: S3_ENDPOINT_URL
+        sync: false            # https://<project-ref>.supabase.co/storage/v1/s3
+      - key: S3_BASE_URL
+        sync: false            # https://<project-ref>.supabase.co/storage/v1/object/public/photos
+
+      # --- CORS ---
+      - key: ALLOWED_ORIGINS
+        value: '["*"]'
+
+      # --- APNs (push bildirim, sonra eklenebilir) ---
+      - key: APNS_KEY_ID
+        value: ""
+      - key: APNS_TEAM_ID
+        value: ""
+      - key: APNS_PRIVATE_KEY
+        value: ""
+      - key: APNS_BUNDLE_ID
+        value: ""
+      - key: APNS_PRODUCTION
+        value: "false"
