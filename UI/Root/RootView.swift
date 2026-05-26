@@ -9,20 +9,19 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if session.isAuthed == false {
+            if !session.isAuthed {
                 AuthLandingView()
+            } else if session.currentProfile != nil || session.onboardingSkipped {
+                // Profil tamamlandı veya kullanıcı kurulumu atlayıp ana sayfaya geçti
+                MainTabView()
             } else {
-                if session.currentProfile == nil {
-                    VStack(spacing: 20) {
-                        Text("Profil bulunamadı.")
-                            .foregroundStyle(.secondary)
-                        Button("Çıkış Yap") { 
-                            session.signOut() 
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                } else {
-                    MainTabView()
+                // Giriş yapıldı ama profil henüz oluşturulmadı → onboarding
+                let isSocial = backendAuthProvider != "email"
+                NavigationStack {
+                    SignUpFlowView(
+                        isSocialLogin: isSocial,
+                        prefillName: isSocial ? session.socialLoginName : ""
+                    )
                 }
             }
         }
@@ -31,5 +30,10 @@ struct RootView: View {
             didBootstrap = true
             session.bootstrap(modelContext: modelContext)
         }
+    }
+
+    /// Backend kullanıcısının auth provider'ını döner
+    private var backendAuthProvider: String {
+        session.backendUser?.auth_provider ?? "email"
     }
 }

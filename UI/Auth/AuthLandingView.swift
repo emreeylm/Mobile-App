@@ -191,6 +191,7 @@ struct AuthLandingView: View {
                     return
                 }
                 Task { @MainActor in
+                    let name = result?.user.profile?.name ?? ""
                     let isNewUser = await session.socialLogin(
                         provider: "google",
                         idToken: idToken,
@@ -198,7 +199,8 @@ struct AuthLandingView: View {
                     )
                     if isNewUser {
                         isSocialSignUp = true
-                        socialName = result?.user.profile?.name ?? ""
+                        socialName = name
+                        session.socialLoginName = name   // RootView için de sakla
                         navigateToSignUp = true
                     }
                 }

@@ -139,8 +139,15 @@ struct SignUpFlowView: View {
         VStack(spacing: 12) {
             HStack {
                 Button {
-                    if step > 1 { withAnimation { step -= 1 } }
-                    else { dismiss() }
+                    let firstStep = isSocialLogin ? 3 : 1
+                    if step > firstStep {
+                        withAnimation { step -= 1 }
+                    } else if isSocialLogin {
+                        // Sosyal girişte ilk adımda geri → ana sayfaya geç (profil tamamlama zorunlu değil)
+                        session.onboardingSkipped = true
+                    } else {
+                        dismiss()
+                    }
                 } label: {
                     Image(systemName: "arrow.left")
                         .font(.system(size: 20, weight: .bold))
