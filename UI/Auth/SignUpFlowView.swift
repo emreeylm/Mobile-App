@@ -143,8 +143,8 @@ struct SignUpFlowView: View {
                     if step > firstStep {
                         withAnimation { step -= 1 }
                     } else if isSocialLogin {
-                        // Sosyal girişte ilk adımda geri → ana sayfaya geç (profil tamamlama zorunlu değil)
-                        session.onboardingSkipped = true
+                        // Sosyal girişte ilk adımda geri → oturumu kapat, giriş sayfasına dön
+                        session.signOut()
                     } else {
                         dismiss()
                     }
