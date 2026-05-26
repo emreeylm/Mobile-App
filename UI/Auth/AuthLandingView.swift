@@ -15,6 +15,8 @@ struct AuthLandingView: View {
     @State private var isAppleLoading = false
     @State private var isGoogleLoading = false
     @State private var navigateToSignUp = false
+    @State private var socialName: String = ""
+    @State private var isSocialSignUp = false
 
     var body: some View {
         NavigationStack {
@@ -141,7 +143,7 @@ struct AuthLandingView: View {
 
                     // Switch to Sign Up
                     NavigationLink(isActive: $navigateToSignUp) {
-                        SignUpFlowView()
+                        SignUpFlowView(isSocialLogin: isSocialSignUp, prefillName: socialName)
                     } label: {
                         HStack {
                             Text("Hesabın yok mu?")
@@ -189,7 +191,11 @@ struct AuthLandingView: View {
                         idToken: idToken,
                         modelContext: modelContext
                     )
-                    if isNewUser { navigateToSignUp = true }
+                    if isNewUser {
+                        isSocialSignUp = true
+                        socialName = result?.user.profile?.name ?? ""
+                        navigateToSignUp = true
+                    }
                 }
             }
         }
@@ -217,7 +223,13 @@ struct AuthLandingView: View {
                 modelContext: modelContext
             )
             isAppleLoading = false
-            if isNewUser { navigateToSignUp = true }
+            if isNewUser {
+                isSocialSignUp = true
+                socialName = credential.fullName.flatMap {
+                    [$0.givenName, $0.familyName].compactMap { $0 }.joined(separator: " ")
+                }.flatMap { $0.isEmpty ? nil : $0 } ?? ""
+                navigateToSignUp = true
+            }
         }
     }
     

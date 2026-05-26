@@ -8,7 +8,11 @@ struct SignUpFlowView: View {
     @EnvironmentObject var session: SessionStore
     @Environment(\.dismiss) private var dismiss
 
-    // Step control
+    // Sosyal giriş (Google/Apple) ile gelindiyse email+şifre adımları atlanır
+    var isSocialLogin: Bool = false
+    var prefillName: String = ""
+
+    // Step control — sosyal girişte 1 ve 2. adımlar (email, şifre) atlanır
     @State private var step: Int = 1
     private let totalSteps = 19
 
@@ -109,9 +113,14 @@ struct SignUpFlowView: View {
         } message: {
             Text(errorMessage)
         }
-        .onAppear { 
+        .onAppear {
             seedMediaIfNeeded()
             fetchInitialMedia()
+            // Sosyal girişte email+şifre adımlarını atla, ismi doldur
+            if isSocialLogin {
+                step = 3
+                if !prefillName.isEmpty { firstName = prefillName }
+            }
         }
         .onChange(of: pickerItems) { _, newItems in loadSelectedPhotos(newItems) }
         .onChange(of: movieSearchQuery) { _, newValue in
@@ -1118,7 +1127,10 @@ struct SignUpFlowView: View {
             defer { isSubmitting = false }
             do {
                 // 1. Kayıt ol ve token al
-                try await session.signUp(email: email, password: password, isim: firstName, modelContext: modelContext)
+                // Sosyal girişte (Google/Apple) hesap zaten oluşturuldu, bu adım atlanır
+                if !isSocialLogin {
+                    try await session.signUp(email: email, password: password, isim: firstName, modelContext: modelContext)
+                }
                 guard let uid = session.currentUserId else { return }
 
                 // 2. Seçilen medyayı backend'e gönder
