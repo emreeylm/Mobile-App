@@ -11,8 +11,8 @@ struct RootView: View {
         Group {
             if !session.isAuthed {
                 AuthLandingView()
-            } else if session.currentProfile != nil || session.onboardingSkipped {
-                // Profil tamamlandı veya kullanıcı kurulumu atlayıp ana sayfaya geçti
+            } else if session.currentProfile != nil || session.onboardingSkipped || session.backendOnboardingDone {
+                // Profil tamamlandı, kurulum atlandı veya backend'de onboarding kaydı var
                 MainTabView()
             } else {
                 // Giriş yapıldı ama profil henüz oluşturulmadı → onboarding

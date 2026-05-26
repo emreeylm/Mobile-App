@@ -24,6 +24,13 @@ final class SessionStore: ObservableObject {
     /// Sosyal giriş (Google/Apple) ile yeni kullanıcı oluşturuldu
     @Published var socialLoginName: String = ""
 
+    /// Backend'de onboarding tamamlandıysa true döner.
+    /// Kayıt sırasında cinsiyet "belirtilmedi" atanır; onboarding sonrası gerçek değer yazılır.
+    var backendOnboardingDone: Bool {
+        guard let user = backendUser else { return false }
+        return user.cinsiyet != "belirtilmedi" && user.hedef_cinsiyet != "belirtilmedi"
+    }
+
     // MARK: - UI State (opsiyonel)
 
     @Published var authErrorMessage: String? = nil
