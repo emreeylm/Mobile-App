@@ -34,6 +34,6 @@ struct RootView: View {
 
     /// Backend kullanıcısının auth provider'ını döner
     private var backendAuthProvider: String {
-        session.backendUser?.auth_provider ?? "email"
+        session.backendUser?.auth_provider ?? "email"  // optional → nil ise "email" varsay
     }
 }

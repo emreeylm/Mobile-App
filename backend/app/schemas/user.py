@@ -30,6 +30,7 @@ class KullaniciOlustur(BaseModel):
 class KullaniciResponse(BaseModel):
     id: uuid.UUID
     email: str
+    auth_provider: str
     isim: str
     yas: int
     cinsiyet: str
