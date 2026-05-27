@@ -33,6 +33,11 @@ def _fake_kullanici(uid: uuid.UUID, *, is_premium: bool = False, is_admin: bool 
     k.is_admin = is_admin
     k.now_watching = None
     k.email = "test@example.com"
+    k.auth_provider = "email"
+    k.provider_id = f"email:test@example.com"
+    k.konum = None
+    k.turler = None
+    k.vip_bilet_bakiye = 0
     k.kayit_tarihi = datetime.datetime.now()
     return k
 
@@ -180,17 +185,14 @@ async def test_auth_protected_endpoints_return_401():
 
 @pytest.mark.asyncio
 async def test_onboarding_grants_welcome_vip_ticket(user_id):
-    """Onboarding tamamlanınca Redis'e 1 VIP bilet yazılmalı (SETNX)."""
+    """Onboarding tamamlanınca DB'ye 1 VIP bilet yazılmalı (grant_welcome_ticket)."""
     db = _make_db()
-    redis = _make_redis()
 
     async def _user(): return user_id
     async def _db(): yield db
-    async def _redis(): yield redis
 
     app.dependency_overrides[get_current_user_id] = _user
     app.dependency_overrides[get_db] = _db
-    app.dependency_overrides[get_redis] = _redis
     try:
         payload = {
             "diziler": [{"id": i, "baslik": f"Dizi {i}", "tip": "tv"} for i in range(5)],
@@ -202,7 +204,8 @@ async def test_onboarding_grants_welcome_vip_ticket(user_id):
 
         assert resp.status_code == 200
         assert resp.json()["welcome_vip_ticket"] == 1
-        redis.setnx.assert_called_once()
+        # grant_welcome_ticket → db.execute çağrılmış olmalı
+        db.execute.assert_called()
     finally:
         app.dependency_overrides.clear()
 
@@ -454,9 +457,10 @@ async def test_patch_user_age_validation(user_id, override_free):
 async def test_vip_send_success(user_id, other_id, override_free):
     """iOS: VIP Bilet gönder → 200."""
     db, redis, kullanici = override_free
-    pipe = redis.pipeline.return_value
-    pipe.get = AsyncMock(return_value=b"1")
-    pipe.execute = AsyncMock(return_value=[0])
+    # consume_vip_ticket: rowcount=1 → bilet tüketildi
+    db.execute.return_value.rowcount = 1
+    # get_balance: first().vip_bilet_bakiye → kalan bakiye
+    db.execute.return_value.first.return_value = MagicMock(vip_bilet_bakiye=0)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post("/api/v1/vip/send", json={"alici_id": str(other_id), "mesaj": None})
@@ -576,9 +580,9 @@ async def test_e2e_limit_then_ad_bonus_then_swipe(user_id, other_id):
 async def test_vip_send_mutual_match_triggers_notification(user_id, other_id, override_free):
     """Eğer alıcı önceden beğendiyse VIP bilet eşleşmeye dönüşmeli ve bildirim gitmeli."""
     db, redis, kullanici = override_free
-    pipe = redis.pipeline.return_value
-    pipe.get = AsyncMock(return_value=b"1")
-    pipe.execute = AsyncMock(return_value=[0])
+    # consume_vip_ticket: rowcount=1 → bilet tüketildi
+    db.execute.return_value.rowcount = 1
+    db.execute.return_value.first.return_value = MagicMock(vip_bilet_bakiye=0)
 
     # Karşı tarafın beğenisi olduğunu taklit et
     existing_like = MagicMock(spec=Eslesme)

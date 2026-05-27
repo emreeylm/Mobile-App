@@ -2,9 +2,8 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, model_validator
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_current_user_id, get_db, get_redis
+from app.core.dependencies import get_current_user_id, get_db
 from app.db.models import KullaniciMedya, Medya, Kullanici
 from app.services import vip_service
 
@@ -41,7 +40,6 @@ async def save_onboarding(
     body: OnboardingRequest,
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
 ):
     all_media = [(m, "tv") for m in body.diziler] + [(m, "movie") for m in body.filmler]
 
@@ -59,7 +57,7 @@ async def save_onboarding(
             km = KullaniciMedya(kullanici_id=user_id, medya_id=item.id)
             await db.merge(km)
 
-    # Hoş geldin hediyesi: ilk onboarding'de 1 VIP bilet (SETNX — tekrar çağrılsa bile verilmez)
-    await vip_service.grant_welcome_ticket(redis, str(user_id))
+    # Hoş geldin hediyesi: ilk onboarding'de 1 VIP bilet (WHERE bakiye=0 → idempotent)
+    await vip_service.grant_welcome_ticket(db, str(user_id))
 
     return {"status": "ok", "medya_count": len(all_media), "welcome_vip_ticket": 1}

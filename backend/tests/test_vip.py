@@ -1,67 +1,75 @@
-"""VIP bilet tüketim testleri."""
+"""VIP bilet tüketim testleri (PostgreSQL tabanlı)."""
+import uuid
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from app.services.vip_service import consume_vip_ticket
+from unittest.mock import AsyncMock, MagicMock
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.vip_service import consume_vip_ticket, get_balance, add_tickets
 
 
-def _make_pipe_mock(balance: int, should_raise: bool = False):
-    """WATCH/MULTI/EXEC pipeline mock'u üretir."""
-    from redis.exceptions import WatchError
-    pipe = AsyncMock()
-    pipe.__aenter__ = AsyncMock(return_value=pipe)
-    pipe.__aexit__ = AsyncMock(return_value=None)
-    pipe.watch = AsyncMock()
-    pipe.multi = MagicMock()
-    pipe.decr = MagicMock()
-    # vip_service `await pipe.get(key)` çağırır; balance değerini döndür
-    pipe.get = AsyncMock(return_value=str(balance).encode() if balance > 0 else b"0")
+def _make_db(rowcount: int = 1, balance: int = 0) -> AsyncMock:
+    """AsyncSession mock'u — consume/get_balance/add_tickets için."""
+    db = AsyncMock(spec=AsyncSession)
 
-    if should_raise:
-        call_count = [0]
-        async def execute_side_effect():
-            call_count[0] += 1
-            if call_count[0] == 1:
-                raise WatchError()
-            return [balance - 1]
-        pipe.execute = execute_side_effect
-    else:
-        pipe.execute = AsyncMock(return_value=[balance - 1])
+    execute_result = MagicMock()
+    execute_result.rowcount = rowcount
+    first_row = MagicMock()
+    first_row.vip_bilet_bakiye = balance
+    execute_result.first.return_value = first_row
 
-    redis = AsyncMock()
-    redis.pipeline = MagicMock(return_value=pipe)
-    return redis, pipe
+    db.execute = AsyncMock(return_value=execute_result)
+    db.commit = AsyncMock()
+    return db
 
 
 @pytest.mark.asyncio
 async def test_consume_ticket_success():
-    redis, pipe = _make_pipe_mock(balance=3)
-    result = await consume_vip_ticket(redis, "user-1")
+    """Bakiye > 0 → bilet tüketilir, True döner."""
+    db = _make_db(rowcount=1)
+    result = await consume_vip_ticket(db, str(uuid.uuid4()))
     assert result is True
+    db.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_consume_ticket_zero_balance():
-    redis, pipe = _make_pipe_mock(balance=0)
-    result = await consume_vip_ticket(redis, "user-1")
+    """Bakiye 0 → rowcount=0 → False döner."""
+    db = _make_db(rowcount=0)
+    result = await consume_vip_ticket(db, str(uuid.uuid4()))
     assert result is False
 
 
 @pytest.mark.asyncio
-async def test_vip_endpoint_requires_auth():
-    import uuid
-    from httpx import AsyncClient, ASGITransport
-    from app.main import app
+async def test_get_balance_returns_value():
+    """get_balance → DB'den bakiyeyi döner."""
+    db = _make_db(balance=3)
+    result = await get_balance(db, str(uuid.uuid4()))
+    assert result == 3
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+
+@pytest.mark.asyncio
+async def test_add_tickets_returns_new_balance():
+    """add_tickets → yeni bakiyeyi döner."""
+    db = _make_db(balance=5)
+    result = await add_tickets(db, str(uuid.uuid4()), count=2)
+    assert result == 5
+    db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_vip_endpoint_requires_auth():
+    async with __import__("httpx").AsyncClient(
+        transport=__import__("httpx").ASGITransport(app=__import__("app.main", fromlist=["app"]).app),
+        base_url="http://test"
+    ) as client:
         resp = await client.post("/api/v1/vip/send", json={"alici_id": str(uuid.uuid4()), "mesaj": None})
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_vip_balance_requires_auth():
-    from httpx import AsyncClient, ASGITransport
-    from app.main import app
-
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with __import__("httpx").AsyncClient(
+        transport=__import__("httpx").ASGITransport(app=__import__("app.main", fromlist=["app"]).app),
+        base_url="http://test"
+    ) as client:
         resp = await client.get("/api/v1/vip/balance")
     assert resp.status_code == 401
