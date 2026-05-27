@@ -5,25 +5,25 @@ import SwiftData
 
 struct AppTheme {
     
-    // Updated Palette: Exact requested colors
-    static let main = Color(hex: "0F172A") // Deep Slate Blue
-    static let accent = Color(hex: "F5E6C8") // Cream Accent
-    static let creamAccent = Color(hex: "F5E6C8") 
-    static let makroTeal = Color(hex: "52C4C4") 
-    static let secondarySlate = Color(hex: "1E293B")
-    static let text = Color(hex: "F1F5F9") // Light gray for text visibility on dark bg
-    
+    // Palette
+    static let main = Color(hex: "141417")         // Ana arka plan
+    static let accent = Color(hex: "F4F4F5")       // Buton & vurgu rengi
+    static let creamAccent = Color(hex: "F4F4F5")
+    static let makroTeal = Color(hex: "52C4C4")
+    static let secondarySlate = Color(hex: "202024") // Kart / ikincil yüzey
+    static let text = Color(hex: "F4F4F5")          // Ana metin rengi
+
     static let primaryGradient = LinearGradient(
-        colors: [main, main], // Solid background as requested
+        colors: [main, main],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
-    
-    static let neonGreen = Color(hex: "00ff9d") // Keeping as utility but minimizing use
+
+    static let neonGreen = Color(hex: "00ff9d")
     static let electricPurple = Color(hex: "bd00ff")
-    
+
     static let buttonGradient = LinearGradient(
-        colors: [accent, Color(hex: "fdf2e9")], // Soft cream gradient
+        colors: [accent, Color(hex: "FAFAFA")],
         startPoint: .leading,
         endPoint: .trailing
     )
@@ -72,7 +72,7 @@ struct ModernSetupButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 18, weight: .bold, design: .rounded))
-            .foregroundColor(Color.black.opacity(0.8))
+            .foregroundColor(AppTheme.main)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity)
             .background(isDisabled ? AppTheme.accent.opacity(0.3) : AppTheme.accent)

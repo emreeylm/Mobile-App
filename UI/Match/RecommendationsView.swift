@@ -479,7 +479,7 @@ struct RecommendationsView: View {
                         Text("Premium'a Geç")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(Color(hex: "0F172A"))
+                    .foregroundStyle(Color(hex: "141417"))
                     .padding(.horizontal, 28)
                     .padding(.vertical, 14)
                     .background(AppTheme.accent)
@@ -519,7 +519,7 @@ struct RecommendationsView: View {
             .padding(36)
             .background(
                 RoundedRectangle(cornerRadius: 32, style: .continuous)
-                    .fill(Color(hex: "1E293B"))
+                    .fill(Color(hex: "202024"))
             )
             .padding(.horizontal, 28)
         }
@@ -1034,7 +1034,7 @@ private struct SuperlikeMessageSheet: View {
                     } label: {
                         Text("Gönder")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color(hex: "0F172A"))
+                            .foregroundStyle(Color(hex: "141417"))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(AppTheme.accent)

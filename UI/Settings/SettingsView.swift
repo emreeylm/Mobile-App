@@ -206,14 +206,14 @@ struct SettingsView: View {
                     .foregroundColor(subscriptionStore.tier.color)
                     .frame(width: 24)
                 
-                Text("Binge Date Premium")
+                Text("Binge Premium")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(AppTheme.text)
                 
                 Spacer()
                 
                 if subscriptionStore.isPremium {
-                    Text(subscriptionStore.tier.displayName.replacingOccurrences(of: "Binge Date ", with: ""))
+                    Text(subscriptionStore.tier.displayName.replacingOccurrences(of: "Binge ", with: ""))
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(subscriptionStore.tier.color)
                         .padding(.horizontal, 8)

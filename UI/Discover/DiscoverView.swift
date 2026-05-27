@@ -251,7 +251,7 @@ struct DiscoverView: View {
                 .padding(.horizontal, 24)
                 .padding(.vertical, 10)
                 .background(isSelected ? AppTheme.creamAccent : AppTheme.text.opacity(0.05))
-                .foregroundColor(isSelected ? Color(hex: "0F172A") : AppTheme.text.opacity(0.6))
+                .foregroundColor(isSelected ? Color(hex: "141417") : AppTheme.text.opacity(0.6))
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
@@ -343,7 +343,7 @@ struct DiscoverView: View {
                         
                         Image(systemName: added ? "checkmark" : "plus")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(added ? .white : Color(hex: "0F172A"))
+                            .foregroundColor(added ? .white : Color(hex: "141417"))
                     }
                     .padding(12)
                 }

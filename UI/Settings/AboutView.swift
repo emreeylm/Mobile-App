@@ -40,7 +40,7 @@ struct AboutView: View {
                     )
 
                     VStack(spacing: 12) {
-                        Text("Binge Date")
+                        Text("Binge")
                             .font(.system(size: 34, weight: .bold, design: .rounded))
                             .foregroundColor(AppTheme.text)
 
@@ -63,7 +63,7 @@ struct AboutView: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(AppTheme.text.opacity(0.3))
 
-                        Text("© 2026 Binge Date Inc.")
+                        Text("© 2026 Binge Inc.")
                             .font(.system(size: 10))
                             .foregroundColor(AppTheme.text.opacity(0.2))
                     }

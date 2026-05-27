@@ -91,7 +91,7 @@ struct PaywallView: View {
 
     private var backgroundGradient: some View {
         LinearGradient(
-            colors: [Color(hex: "0F172A"), Color(hex: "1a1a3e"), Color(hex: "0F172A")],
+            colors: [Color(hex: "141417"), Color(hex: "202024"), Color(hex: "141417")],
             startPoint: animateGradient ? .topLeading : .bottomLeading,
             endPoint:   animateGradient ? .bottomTrailing : .topTrailing
         )
@@ -117,11 +117,11 @@ struct PaywallView: View {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 48))
                     .foregroundStyle(LinearGradient(
-                        colors: [AppTheme.accent, Color(hex: "D4A574")],
+                        colors: [AppTheme.accent, Color(hex: "FAFAFA")],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     ))
             }
-            Text("Binge Date Premium")
+            Text("Binge Premium")
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundStyle(AppTheme.text)
             Text("Film zevkine göre ruh eşini bulmak\nhiç bu kadar kolay olmamıştı")
@@ -176,7 +176,7 @@ struct PaywallView: View {
                 if tier == .gold {
                     Text("EN POPÜLER")
                         .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(Color(hex: "0F172A"))
+                        .foregroundStyle(Color(hex: "141417"))
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .background(AppTheme.accent)
                         .clipShape(Capsule())
@@ -184,7 +184,7 @@ struct PaywallView: View {
                     Color.clear.frame(height: 20)
                 }
                 Image(systemName: tier.iconName).font(.system(size: 28)).foregroundStyle(tier.color)
-                Text(tier.displayName.replacingOccurrences(of: "Binge Date ", with: ""))
+                Text(tier.displayName.replacingOccurrences(of: "Binge ", with: ""))
                     .font(.system(size: 20, weight: .bold, design: .rounded)).foregroundStyle(AppTheme.text)
                 VStack(spacing: 2) {
                     if isLoading {
@@ -219,7 +219,7 @@ struct PaywallView: View {
                 if tier == .gold {
                     Text("EN POPÜLER")
                         .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(Color(hex: "0F172A"))
+                        .foregroundStyle(Color(hex: "141417"))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(AppTheme.accent)
@@ -232,7 +232,7 @@ struct PaywallView: View {
                     .font(.system(size: 28))
                     .foregroundStyle(tier.color)
 
-                Text(tier.displayName.replacingOccurrences(of: "Binge Date ", with: ""))
+                Text(tier.displayName.replacingOccurrences(of: "Binge ", with: ""))
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundStyle(AppTheme.text)
 
@@ -351,18 +351,18 @@ struct PaywallView: View {
             HStack(spacing: 10) {
                 if subscriptionStore.isPurchasing {
                     ProgressView()
-                        .tint(Color(hex: "0F172A"))
+                        .tint(Color(hex: "141417"))
                 } else if subscriptionStore.tier == selectedTier {
                     Image(systemName: "checkmark.circle.fill")
                     Text("Zaten Aktif")
                 } else {
                     let price = selectedProduct?.displayPrice ?? (selectedTier == .gold ? subscriptionStore.goldFallbackPrice : subscriptionStore.plusFallbackPrice)
                     Image(systemName: "lock.open.fill")
-                    Text("\(selectedTier.displayName.replacingOccurrences(of: "Binge Date ", with: "")) — \(price)/ay")
+                    Text("\(selectedTier.displayName.replacingOccurrences(of: "Binge ", with: "")) — \(price)/ay")
                 }
             }
             .font(.system(size: 17, weight: .bold, design: .rounded))
-            .foregroundStyle(Color(hex: "0F172A"))
+            .foregroundStyle(Color(hex: "141417"))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
             .background(
@@ -431,7 +431,7 @@ struct PaywallView: View {
                     .foregroundStyle(AppTheme.text.opacity(0.6))
             }
             .padding(40)
-            .background(RoundedRectangle(cornerRadius: 32, style: .continuous).fill(Color(hex: "1E293B")))
+            .background(RoundedRectangle(cornerRadius: 32, style: .continuous).fill(Color(hex: "202024")))
             .transition(.scale.combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: showConfirmation)

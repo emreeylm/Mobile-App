@@ -62,7 +62,7 @@ struct PremiumFeatureGate: View {
                     Text("Premium'a Geç")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(Color(hex: "0F172A"))
+                .foregroundStyle(Color(hex: "141417"))
                 .padding(.horizontal, 28)
                 .padding(.vertical, 14)
                 .background(
@@ -108,7 +108,7 @@ struct PremiumBanner: View {
                     .foregroundStyle(AppTheme.accent)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Binge Date Premium")
+                    Text("Binge Premium")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(AppTheme.text)
                     

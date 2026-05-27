@@ -14,8 +14,8 @@ enum SubscriptionTier: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .free: return "Free"
-        case .plus: return "Binge Date Plus"
-        case .gold: return "Binge Date Gold"
+        case .plus: return "Binge Plus"
+        case .gold: return "Binge Gold"
         }
     }
 

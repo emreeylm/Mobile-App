@@ -421,7 +421,7 @@ struct ProfilePreviewView: View {
                 Text("VIP Mesaj Gönder")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(Color(hex: "0F172A"))
+            .foregroundStyle(Color(hex: "141417"))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(AppTheme.accent)
@@ -470,11 +470,11 @@ private struct VIPSendSheet: View {
                     } label: {
                         Group {
                             if isSending {
-                                ProgressView().tint(Color(hex: "0F172A"))
+                                ProgressView().tint(Color(hex: "141417"))
                             } else {
                                 Text("Gönder")
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color(hex: "0F172A"))
+                                    .foregroundStyle(Color(hex: "141417"))
                             }
                         }
                         .frame(maxWidth: .infinity)

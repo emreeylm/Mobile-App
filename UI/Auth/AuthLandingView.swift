@@ -30,7 +30,7 @@ struct AuthLandingView: View {
                     
                     // Title
                     VStack(spacing: 8) {
-                        Text("Binge Date")
+                        Text("Binge")
                             .font(.system(size: 60, weight: .heavy, design: .rounded))
                             .foregroundStyle(AppTheme.text)
                             .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
