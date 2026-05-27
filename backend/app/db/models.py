@@ -25,6 +25,7 @@ class Kullanici(Base):
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     kayit_tarihi: Mapped[datetime] = mapped_column(server_default=func.now())
     turler: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    vip_bilet_bakiye: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     medyalar: Mapped[list["KullaniciMedya"]] = relationship(back_populates="kullanici", cascade="all, delete-orphan")
 

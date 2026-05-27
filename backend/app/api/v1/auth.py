@@ -5,13 +5,11 @@ from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import create_access_token, create_refresh_token, decode_token
-from app.core.dependencies import get_redis
 from app.db.session import get_db
 from app.db.models import Kullanici
 from app.schemas.auth import EmailLoginRequest, EmailRegisterRequest, RefreshRequest, SocialAuthRequest, TokenResponse
-from app.services import auth_service, vip_service
+from app.services import auth_service
 from app.services.password_service import hash_password, verify_password
-from redis.asyncio import Redis
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -30,7 +28,6 @@ async def check_email(email: str, db: AsyncSession = Depends(get_db)):
 async def social_login(
     body: SocialAuthRequest,
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
 ):
     """Apple veya Google id_token'ı doğrular; kullanıcı yoksa oluşturur."""
     try:
@@ -62,10 +59,10 @@ async def social_login(
                 yas=18,
                 cinsiyet="belirtilmedi",
                 hedef_cinsiyet="belirtilmedi",
+                vip_bilet_bakiye=1,  # Hoşgeldin bileti
             )
             db.add(kullanici)
             await db.flush()
-            await vip_service.grant_welcome_ticket(redis, str(kullanici.id))
 
     user_id = str(kullanici.id)
     return TokenResponse(
@@ -79,7 +76,6 @@ async def social_login(
 async def email_register(
     body: EmailRegisterRequest,
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
 ):
     """Email + şifre ile yeni hesap oluşturur."""
     async with db.begin():
@@ -96,10 +92,10 @@ async def email_register(
             cinsiyet="belirtilmedi",
             hedef_cinsiyet="belirtilmedi",
             password_hash=hash_password(body.password),
+            vip_bilet_bakiye=1,  # Hoşgeldin bileti
         )
         db.add(kullanici)
         await db.flush()
-        await vip_service.grant_welcome_ticket(redis, str(kullanici.id))
 
     user_id = str(kullanici.id)
     return TokenResponse(

@@ -19,7 +19,8 @@ async def send_vip_ticket(
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
 ):
-    consumed = await vip_service.consume_vip_ticket(redis, str(user_id))
+    # Bakiyeden bilet düş (atomik PostgreSQL UPDATE)
+    consumed = await vip_service.consume_vip_ticket(db, str(user_id))
     if not consumed:
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Yeterli VIP bilet yok")
 
@@ -50,13 +51,13 @@ async def send_vip_ticket(
     if eslesme_oldu:
         await notification_service.notify_new_match(redis, str(body.alici_id), gonderen_isim)
 
-    kalan = await vip_service.get_balance(redis, str(user_id))
+    kalan = await vip_service.get_balance(db, str(user_id))
     return VipResponse(basarili=True, kalan_bilet=kalan, eslesme_oldu=eslesme_oldu)
 
 
 @router.get("/balance")
 async def get_balance(
     user_id: uuid.UUID = Depends(get_current_user_id),
-    redis: Redis = Depends(get_redis),
+    db: AsyncSession = Depends(get_db),
 ):
-    return {"balance": await vip_service.get_balance(redis, str(user_id))}
+    return {"balance": await vip_service.get_balance(db, str(user_id))}

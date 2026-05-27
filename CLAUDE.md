@@ -85,20 +85,24 @@ binge-date/
 ```sql
 -- Kullanıcılar
 CREATE TABLE tbl_kullanicilar (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email           VARCHAR(255) UNIQUE NOT NULL,
-    auth_provider   VARCHAR(50) NOT NULL,          -- 'apple' | 'google'
-    provider_id     VARCHAR(255) UNIQUE NOT NULL,
-    isim            VARCHAR(100) NOT NULL,
-    yas             INT NOT NULL,
-    cinsiyet        VARCHAR(20) NOT NULL,
-    hedef_cinsiyet  VARCHAR(20) NOT NULL,
-    konum           GEOMETRY(Point, 4326),          -- PostGIS
-    now_watching    VARCHAR(255),
-    is_premium      BOOLEAN NOT NULL DEFAULT FALSE,
-    kayit_tarihi    TIMESTAMP NOT NULL DEFAULT NOW()
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email             VARCHAR(255) UNIQUE NOT NULL,
+    auth_provider     VARCHAR(50) NOT NULL,          -- 'apple' | 'google' | 'email'
+    provider_id       VARCHAR(255) UNIQUE NOT NULL,
+    isim              VARCHAR(100) NOT NULL,
+    yas               INT NOT NULL,
+    cinsiyet          VARCHAR(20) NOT NULL,
+    hedef_cinsiyet    VARCHAR(20) NOT NULL,
+    konum             GEOMETRY(Point, 4326),          -- PostGIS
+    now_watching      VARCHAR(255),
+    is_premium        BOOLEAN NOT NULL DEFAULT FALSE,
+    is_admin          BOOLEAN NOT NULL DEFAULT FALSE, -- /reports admin endpoint koruması
+    password_hash     VARCHAR(255),                   -- e-posta/şifre girişi için (nullable)
+    turler            VARCHAR(512),                   -- onboarding'de seçilen türler (virgülle ayrılmış)
+    vip_bilet_bakiye  INTEGER NOT NULL DEFAULT 0,     -- VIP bilet bakiyesi (PostgreSQL'de tutulur)
+    kayit_tarihi      TIMESTAMP NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_kullanicilar_konum ON tbl_kullanicilar USING GIST(konum);
+CREATE INDEX idx_tbl_kullanicilar_konum ON tbl_kullanicilar USING GIST(konum);
 
 -- Medya (TMDB ID birincil anahtar)
 CREATE TABLE tbl_medya (
@@ -167,27 +171,27 @@ async def check_and_increment_swipe(redis, user_id: str) -> bool:
     return True
 ```
 
-### 3. VIP Bilet Race Condition Koruması (vip_service.py)
+### 3. VIP Bilet Yönetimi (vip_service.py)
+
+Bakiye `tbl_kullanicilar.vip_bilet_bakiye` kolonunda tutulur (Redis değil).
+PostgreSQL'in atomik `UPDATE RETURNING` ifadesi race condition olmaksızın güvenlidir.
 
 ```python
-VIP_KEY = "user:vip_tickets:{user_id}"
-
-async def consume_vip_ticket(redis, user_id: str) -> bool:
-    key = VIP_KEY.format(user_id=user_id)
-    async with redis.pipeline(transaction=True) as pipe:
-        while True:
-            try:
-                await pipe.watch(key)
-                balance = int(await pipe.get(key) or 0)
-                if balance <= 0:
-                    return False
-                pipe.multi()
-                pipe.decr(key)
-                await pipe.execute()
-                return True
-            except WatchError:
-                continue
+async def consume_vip_ticket(db: AsyncSession, user_id: str) -> bool:
+    result = await db.execute(
+        text("""
+            UPDATE tbl_kullanicilar
+            SET vip_bilet_bakiye = vip_bilet_bakiye - 1
+            WHERE id = :user_id AND vip_bilet_bakiye > 0
+            RETURNING vip_bilet_bakiye
+        """),
+        {"user_id": user_id},
+    )
+    await db.commit()
+    return result.rowcount == 1
 ```
+
+Yeni kullanıcı kaydında `vip_bilet_bakiye=1` constructor'da set edilir (hoşgeldin bileti).
 
 ### 4. OAuth2 → JWT Akışı (/api/v1/auth/social)
 
