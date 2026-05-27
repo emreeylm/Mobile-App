@@ -1,7 +1,9 @@
 import SwiftUI
 import SwiftData
+import os
 
 struct MediaDiscoverView: View {
+    private let logger = Logger(subsystem: "com.bingedate", category: "MediaDiscoverView")
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var session: SessionStore
@@ -152,7 +154,7 @@ struct MediaDiscoverView: View {
                     }
                 }
             } catch {
-                print("TMDB Search Error: \(error)")
+                logger.warning("TMDB search error: \(error)")
             }
         }
     }
@@ -164,7 +166,7 @@ struct MediaDiscoverView: View {
                 self.apiResults = results
             }
         } catch {
-            print("TMDB Popular Error: \(error)")
+            logger.warning("TMDB popular fetch error: \(error)")
         }
     }
 

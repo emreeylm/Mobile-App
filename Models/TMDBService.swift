@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 struct TMDBSearchResult: Codable, Identifiable {
     let id: Int
@@ -35,6 +36,7 @@ struct TMDBResponse: Codable {
 
 class TMDBService {
     static let shared = TMDBService()
+    private let logger = Logger(subsystem: "com.bingedate", category: "TMDBService")
 
     /// API key'i Info.plist'ten okur.
     /// Xcode scheme / .xcconfig → `TMDB_API_KEY=<key>` ile tanımlanmalı,
@@ -77,13 +79,13 @@ class TMDBService {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                print("TMDB API Error: Status \(httpResponse.statusCode)")
+                logger.warning("TMDB API error: status \(httpResponse.statusCode)")
                 return getMockData(type: type).filter { $0.displayName.localizedCaseInsensitiveContains(query) }
             }
             let res = try decoder.decode(TMDBResponse.self, from: data)
             return res.results
         } catch {
-            print("TMDB API Catch: \(error)")
+            logger.error("TMDB API fetch failed: \(error)")
             return getMockData(type: type).filter { $0.displayName.localizedCaseInsensitiveContains(query) }
         }
     }
@@ -118,13 +120,13 @@ class TMDBService {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                print("TMDB API Error: Status \(httpResponse.statusCode)")
+                logger.warning("TMDB API error: status \(httpResponse.statusCode)")
                 return getMockData(type: type)
             }
             let res = try decoder.decode(TMDBResponse.self, from: data)
             return res.results
         } catch {
-            print("TMDB API Catch: \(error)")
+            logger.error("TMDB API fetch failed: \(error)")
             return getMockData(type: type)
         }
     }

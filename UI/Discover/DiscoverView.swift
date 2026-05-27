@@ -1,11 +1,13 @@
 import SwiftUI
 import SwiftData
+import os
 
 struct DiscoverView: View {
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var session: SessionStore
     @Environment(\.dismiss) private var dismiss
+    private let logger = Logger(subsystem: "com.bingedate", category: "DiscoverView")
 
     @Query private var mediaItems: [MediaItem]
     @Query private var profileMedia: [ProfileMedia]
@@ -398,7 +400,7 @@ struct DiscoverView: View {
                     }
                 }
             } catch {
-                print("TMDB Search Error: \(error)")
+                logger.warning("TMDB search error: \(error)")
             }
         }
     }
@@ -431,7 +433,7 @@ struct DiscoverView: View {
                 }
             }
         } catch {
-            print("TMDB Popular Error: \(error)")
+            logger.warning("TMDB popular fetch error: \(error)")
         }
     }
 

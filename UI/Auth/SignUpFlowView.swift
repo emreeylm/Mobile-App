@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import os
 
 struct SignUpFlowView: View {
 
@@ -31,6 +32,7 @@ struct SignUpFlowView: View {
         _firstName = State(initialValue: prefillName)
     }
     @State private var isCheckingEmail = false
+    private let logger = Logger(subsystem: "com.bingedate", category: "SignUpFlow")
     @State private var city: String = ""
     @State private var birthday: Date = Calendar.current.date(byAdding: .year, value: -20, to: .now) ?? .now
     @State private var gender: Gender = .male
@@ -1287,21 +1289,21 @@ struct SignUpFlowView: View {
             if Task.isCancelled { return }
             
             do {
-                print("TMDB: Searching \(type) -> \(query)")
+                logger.debug("TMDB search: type=\(type) query=\(query)")
                 let results = try await TMDBService.shared.search(query: query, type: type)
                 if Task.isCancelled { return }
                 
                 await MainActor.run {
                     if type == .movie { 
                         movieSearchResults = results 
-                        print("TMDB: Found \(results.count) movies")
+                        logger.debug("TMDB found \(results.count) movies")
                     } else { 
                         seriesSearchResults = results 
-                        print("TMDB: Found \(results.count) series")
+                        logger.debug("TMDB found \(results.count) series")
                     }
                 }
             } catch {
-                print("TMDB Search Error: \(error.localizedDescription)")
+                logger.warning("TMDB search error: \(error.localizedDescription)")
             }
         }
         
@@ -1320,7 +1322,7 @@ struct SignUpFlowView: View {
                     self.seriesSearchResults = s
                 }
             } catch {
-                print("TMDB Popular Error: \(error)")
+                logger.warning("TMDB popular fetch error: \(error)")
             }
         }
     }
