@@ -24,12 +24,13 @@ struct SignUpFlowView: View {
     @State private var password: String = ""
     @State private var firstName: String
 
-    init(isSocialLogin: Bool = false, prefillName: String = "", onBack: (() -> Void)? = nil) {
+    init(isSocialLogin: Bool = false, prefillName: String = "", initialEmail: String = "", onBack: (() -> Void)? = nil) {
         self.isSocialLogin = isSocialLogin
         self.prefillName = prefillName
         self.onBack = onBack
         _step = State(initialValue: isSocialLogin ? 3 : 1)
         _firstName = State(initialValue: prefillName)
+        _email = State(initialValue: initialEmail)
     }
     @State private var isCheckingEmail = false
     private let logger = Logger(subsystem: "com.bingedate", category: "SignUpFlow")

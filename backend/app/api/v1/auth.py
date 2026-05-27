@@ -114,8 +114,11 @@ async def email_login(
     result = await db.execute(select(Kullanici).where(Kullanici.email == body.email))
     kullanici = result.scalar_one_or_none()
 
-    if not kullanici or not kullanici.password_hash or not verify_password(body.password, kullanici.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email veya şifre hatalı")
+    if not kullanici or not kullanici.password_hash:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bu e-postaya kayıtlı hesap bulunamadı")
+
+    if not verify_password(body.password, kullanici.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-posta veya şifre hatalı")
 
     user_id = str(kullanici.id)
     return TokenResponse(

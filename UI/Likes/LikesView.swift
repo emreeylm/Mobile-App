@@ -17,6 +17,7 @@ struct LikesView: View {
     @State private var errorMessage: String? = nil
     @State private var unlockedLikeIds: Set<String> = []
     @State private var selectedEntryToUnlock: LikeEntry? = nil
+    @State private var profileToShow: Profile? = nil
 
     var body: some View {
         NavigationStack {
@@ -60,6 +61,16 @@ struct LikesView: View {
             .fullScreenCover(isPresented: $showPaywall) {
                 PaywallView()
             }
+            .sheet(isPresented: Binding(
+                get: { profileToShow != nil },
+                set: { if !$0 { profileToShow = nil } }
+            )) {
+                if let p = profileToShow {
+                    ProfilePreviewView(profile: p)
+                        .environmentObject(session)
+                        .environmentObject(subscriptionStore)
+                }
+            }
             .task { await refreshLikes() }
             .alert("Bağlantı Hatası", isPresented: Binding(
                 get: { errorMessage != nil },
@@ -101,6 +112,13 @@ struct LikesView: View {
                     let displayEntry = isUnlocked ? entry.deblurred : entry
                     BackendLikeRow(
                         entry: displayEntry,
+                        onProfileTap: {
+                            profileToShow = getOrCreateProfileStub(
+                                backendId: displayEntry.id,
+                                isim: displayEntry.isim ?? "Kullanıcı",
+                                yas: displayEntry.yas
+                            )
+                        },
                         onAccept: { acceptBackendLike(displayEntry) },
                         onReject: { rejectBackendLike(displayEntry) }
                     )
@@ -133,6 +151,7 @@ struct LikesView: View {
                         profile: profile,
                         isSuperLike: true,
                         isBlurred: false,
+                        onProfileTap: { profileToShow = profile },
                         onAccept: { if let e = edge { acceptLike(e, other: profile) } },
                         onReject: { if let e = edge { rejectLike(e) } }
                     )
@@ -166,6 +185,7 @@ struct LikesView: View {
                     OutgoingLikeRow(
                         profile: profile,
                         isSuperLike: edge.isSuperLike,
+                        onProfileTap: { profileToShow = profile },
                         onSuperLike: {
                             guard !edge.isSuperLike else { return }
                             guard subscriptionStore.consumeSuperLike() else {
@@ -346,27 +366,37 @@ struct LikesView: View {
 
 private struct BackendLikeRow: View {
     let entry: LikeEntry
+    var onProfileTap: (() -> Void)? = nil
     var onAccept: () -> Void
     var onReject: () -> Void
 
     var body: some View {
         HStack(spacing: 15) {
-            avatarView
-            VStack(alignment: .leading, spacing: 4) {
-                if entry.blur {
-                    Text("Gizli Profil")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.text)
-                } else {
-                    Text("\(entry.isim ?? ""), \(entry.yas)")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.text)
-                }
-                Text("Sizi beğendi • Yakın zamanda")
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppTheme.text.opacity(0.6))
+            // Avatar — blur değilse tıklanabilir
+            profileTapWrapper(enabled: onProfileTap != nil && !entry.blur) {
+                avatarView
             }
+
+            // İsim + açıklama — blur değilse tıklanabilir
+            profileTapWrapper(enabled: onProfileTap != nil && !entry.blur) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if entry.blur {
+                        Text("Gizli Profil")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(AppTheme.text)
+                    } else {
+                        Text("\(entry.isim ?? ""), \(entry.yas)")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(AppTheme.text)
+                    }
+                    Text("Sizi beğendi • Yakın zamanda")
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppTheme.text.opacity(0.6))
+                }
+            }
+
             Spacer()
+
             HStack(spacing: 8) {
                 Button { onAccept() } label: {
                     ZStack {
@@ -383,6 +413,16 @@ private struct BackendLikeRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// Tıklanabilirlik sarmalayıcısı — enabled ise Button(.plain), değilse düz görünüm
+    @ViewBuilder
+    private func profileTapWrapper<Content: View>(enabled: Bool, @ViewBuilder content: () -> Content) -> some View {
+        if enabled, let tap = onProfileTap {
+            Button(action: tap) { content() }.buttonStyle(.plain)
+        } else {
+            content()
+        }
     }
 
     private var avatarView: some View {
@@ -418,27 +458,20 @@ private struct LikeRow: View {
     let profile: Profile
     let isSuperLike: Bool
     var isBlurred: Bool = false
+    var onProfileTap: (() -> Void)? = nil
     var onAccept: () -> Void
     var onReject: () -> Void
 
     var body: some View {
         HStack(spacing: 15) {
-            avatarView
-            VStack(alignment: .leading, spacing: 4) {
-                if isBlurred {
-                    Text("Gizli Profil")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.text)
-                } else {
-                    Text("\(profile.name), \(profile.age)")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.text)
-                }
-                Text(isSuperLike ? "Super Liked • Yakın zamanda" : "Sizi beğendi • Yakın zamanda")
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppTheme.text.opacity(0.6))
-            }
+            // Avatar — blur değilse tıklanabilir
+            avatarButton
+
+            // İsim — blur değilse tıklanabilir
+            nameButton
+
             Spacer()
+
             HStack(spacing: 8) {
                 Button { onAccept() } label: {
                     ZStack {
@@ -459,6 +492,41 @@ private struct LikeRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var avatarButton: some View {
+        if !isBlurred, let tap = onProfileTap {
+            Button(action: tap) { avatarView }.buttonStyle(.plain)
+        } else {
+            avatarView
+        }
+    }
+
+    @ViewBuilder
+    private var nameButton: some View {
+        if !isBlurred, let tap = onProfileTap {
+            Button(action: tap) { nameContent }.buttonStyle(.plain)
+        } else {
+            nameContent
+        }
+    }
+
+    private var nameContent: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if isBlurred {
+                Text("Gizli Profil")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppTheme.text)
+            } else {
+                Text("\(profile.name), \(profile.age)")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppTheme.text)
+            }
+            Text(isSuperLike ? "Super Liked • Yakın zamanda" : "Sizi beğendi • Yakın zamanda")
+                .font(.system(size: 14))
+                .foregroundStyle(AppTheme.text.opacity(0.6))
+        }
     }
 
     private var avatarView: some View {
@@ -491,41 +559,51 @@ private struct LikeRow: View {
 private struct OutgoingLikeRow: View {
     let profile: Profile
     let isSuperLike: Bool
+    var onProfileTap: () -> Void = {}
     var onSuperLike: () -> Void
     var onUnlike: () -> Void
 
     var body: some View {
         HStack(spacing: 15) {
-            ZStack {
-                if let d = profile.photos.sorted(by: { $0.order < $1.order }).first?.data,
-                   let ui = UIImage(data: d) {
-                    Image(uiImage: ui).resizable().scaledToFill()
-                } else {
-                    Circle().fill(AppTheme.surface)
-                    Image(systemName: "person.fill").foregroundStyle(AppTheme.text.opacity(0.4))
-                }
-            }
-            .frame(width: 56, height: 56)
-            .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text("\(profile.firstName), \(profile.calculatedAge)")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(AppTheme.text)
-                    if isSuperLike {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.yellow)
+            // Avatar — tıklanınca profil açılır
+            Button(action: onProfileTap) {
+                ZStack {
+                    if let d = profile.photos.sorted(by: { $0.order < $1.order }).first?.data,
+                       let ui = UIImage(data: d) {
+                        Image(uiImage: ui).resizable().scaledToFill()
+                    } else {
+                        Circle().fill(AppTheme.surface)
+                        Image(systemName: "person.fill").foregroundStyle(AppTheme.text.opacity(0.4))
                     }
                 }
-                Text(isSuperLike ? "Superlike gönderildi" : "Beğenildi")
-                    .font(.system(size: 13))
-                    .foregroundStyle(AppTheme.text.opacity(0.5))
+                .frame(width: 56, height: 56)
+                .clipShape(Circle())
             }
+            .buttonStyle(.plain)
+
+            // İsim + durum — tıklanınca profil açılır
+            Button(action: onProfileTap) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("\(profile.firstName), \(profile.calculatedAge)")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(AppTheme.text)
+                        if isSuperLike {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.yellow)
+                        }
+                    }
+                    Text(isSuperLike ? "Superlike gönderildi" : "Beğenildi")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppTheme.text.opacity(0.5))
+                }
+            }
+            .buttonStyle(.plain)
 
             Spacer()
 
+            // Aksiyon butonları (bağımsız)
             HStack(spacing: 10) {
                 if !isSuperLike {
                     Button(action: onSuperLike) {

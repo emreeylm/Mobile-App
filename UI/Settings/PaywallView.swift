@@ -272,24 +272,37 @@ struct PaywallView: View {
 
     private var featureList: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("NELER DAHİL?")
-                .font(.system(size: 13, weight: .heavy))
-                .foregroundStyle(AppTheme.text.opacity(0.4))
-                .padding(.bottom, 16)
-                .padding(.horizontal, 4)
+            // Başlık + plan etiketi
+            HStack {
+                Text("NELER DAHİL?")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(AppTheme.text.opacity(0.4))
+                Spacer()
+                Text(selectedTier == .plus ? "Plus" : "Gold")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(selectedTier.color)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(selectedTier.color.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+            .padding(.bottom, 16)
+            .padding(.horizontal, 4)
 
-            featureRow(icon: "arrow.left.arrow.right", text: "Sınırsız Swipe",
-                       free: "10/gün", plus: true, gold: true)
-            featureRow(icon: "eye.fill", text: "Seni Beğenenleri Gör",
-                       free: false, plus: true, gold: true)
-            featureRow(icon: "arrow.uturn.left", text: "Geri Al (Rewind)",
-                       free: false, plus: true, gold: true)
-            featureRow(icon: "star.fill", text: "SuperLike",
-                       free: "1/gün", plus: "5/gün", gold: true)
-            featureRow(icon: "envelope.badge.fill", text: "VIP Mesajlı Beğeni",
-                       free: false, plus: true, gold: true)
-            featureRow(icon: "bolt.fill", text: "Öncelikli Profil (Boost)",
-                       free: false, plus: false, gold: true)
+            featureRow(icon: "heart.fill",           text: "Beğeni Hakkı",
+                       plus: "50/gün",               gold: "Sınırsız")
+            featureRow(icon: "star.fill",            text: "Superlike",
+                       plus: "10/ay",                gold: "40/ay")
+            featureRow(icon: "bolt.fill",            text: "Boost",
+                       plus: "3/ay",                 gold: "15/ay")
+            featureRow(icon: "eye.fill",             text: "Seni Beğenenleri Gör",
+                       plus: true,                   gold: true)
+            featureRow(icon: "location.fill",        text: "Konumunu Ayarla",
+                       plus: true,                   gold: true)
+            featureRow(icon: "person.2.fill",        text: "Yaş Aralığını Belirle",
+                       plus: true,                   gold: true)
+            featureRow(icon: "ruler",                text: "Boy Aralığını Belirle",
+                       plus: true,                   gold: true, isLast: true)
         }
         .padding(20)
         .background(
@@ -302,31 +315,41 @@ struct PaywallView: View {
         )
     }
 
-    private func featureRow(icon: String, text: String, free: Any, plus: Any, gold: Any) -> some View {
+    private func featureRow(icon: String, text: String, plus: Any, gold: Any, isLast: Bool = false) -> some View {
         let activeValue: Any = selectedTier == .plus ? plus : gold
         return HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(selectedTier.color.opacity(0.8))
+                .font(.system(size: 15))
+                .foregroundStyle(selectedTier.color.opacity(0.85))
                 .frame(width: 24)
+
             Text(text)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(AppTheme.text.opacity(0.8))
+                .foregroundStyle(AppTheme.text.opacity(0.85))
+
             Spacer()
+
             Group {
                 if let boolValue = activeValue as? Bool {
                     Image(systemName: boolValue ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(.system(size: 18))
                         .foregroundStyle(boolValue ? .green : AppTheme.text.opacity(0.2))
                 } else if let stringValue = activeValue as? String {
                     Text(stringValue)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(selectedTier.color)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(selectedTier.color.opacity(0.12))
+                        .clipShape(Capsule())
                 }
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 13)
         .overlay(alignment: .bottom) {
-            Rectangle().fill(AppTheme.text.opacity(0.04)).frame(height: 1)
+            if !isLast {
+                Rectangle().fill(AppTheme.text.opacity(0.05)).frame(height: 1)
+            }
         }
     }
 

@@ -4,15 +4,17 @@ import SwiftData
 struct MessagesInboxView: View {
 
     @EnvironmentObject var session: SessionStore
+    @EnvironmentObject var subscriptionStore: AppSubscriptionStore
     @Environment(\.modelContext) private var modelContext
     @Query private var threads: [ChatThread]
     @Query private var profiles: [Profile]
-    @Query private var matches: [Match] // ✅ Added matches query for "New Matches"
+    @Query private var matches: [Match]
     @Query private var messages: [ChatMessage]
 
     @State private var searchText = ""
     @State private var backendMatches: [MatchEntry] = []
     @State private var errorMessage: String? = nil
+    @State private var profileToShow: Profile? = nil
 
     var body: some View {
         NavigationStack {
@@ -35,6 +37,16 @@ struct MessagesInboxView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: Binding(
+                get: { profileToShow != nil },
+                set: { if !$0 { profileToShow = nil } }
+            )) {
+                if let p = profileToShow {
+                    ProfilePreviewView(profile: p)
+                        .environmentObject(session)
+                        .environmentObject(subscriptionStore)
+                }
+            }
             .task { await fetchBackendMatches() }
             .alert("Bağlantı Hatası", isPresented: Binding(
                 get: { errorMessage != nil },
@@ -173,7 +185,8 @@ struct MessagesInboxView: View {
                                     profile: other,
                                     subtitle: lastMessageText(threadId: t.id),
                                     unreadCount: unreadCount(threadId: t.id),
-                                    time: lastMessageTime(threadId: t.id)
+                                    time: lastMessageTime(threadId: t.id),
+                                    onProfileTap: { profileToShow = other }
                                 )
                             }
                             .buttonStyle(.plain)
@@ -346,42 +359,48 @@ private struct InboxRow: View {
     let subtitle: String
     let unreadCount: Int
     let time: String
+    var onProfileTap: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 16) {
-            // Avatar
-            ZStack(alignment: .bottomTrailing) {
-                Group {
-                    if let d = profile.photos.sorted(by: { $0.order < $1.order }).first?.data,
-                       let ui = UIImage(data: d) {
-                        Image(uiImage: ui)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        ZStack {
-                            Circle().fill(AppTheme.surface)
-                            Image(systemName: "person.fill").foregroundStyle(AppTheme.text.opacity(0.3))
+            // Avatar — tıklanınca profil açılır, satırın geri kalanı sohbete yönlendirir
+            Button {
+                onProfileTap?()
+            } label: {
+                ZStack(alignment: .bottomTrailing) {
+                    Group {
+                        if let d = profile.photos.sorted(by: { $0.order < $1.order }).first?.data,
+                           let ui = UIImage(data: d) {
+                            Image(uiImage: ui)
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            ZStack {
+                                Circle().fill(AppTheme.surface)
+                                Image(systemName: "person.fill").foregroundStyle(AppTheme.text.opacity(0.3))
+                            }
                         }
                     }
+                    .frame(width: 64, height: 64)
+                    .clipShape(Circle())
+
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 12, height: 12)
+                        .overlay(Circle().stroke(AppTheme.background, lineWidth: 2))
+                        .padding(2)
                 }
-                .frame(width: 64, height: 64)
-                .clipShape(Circle())
-                
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 12, height: 12)
-                    .overlay(Circle().stroke(AppTheme.background, lineWidth: 2))
-                    .padding(2)
             }
+            .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(profile.firstName)
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(AppTheme.text)
-                    
+
                     Spacer()
-                    
+
                     Text(time)
                         .font(.system(size: 13))
                         .foregroundStyle(AppTheme.text.opacity(0.4))
@@ -392,7 +411,7 @@ private struct InboxRow: View {
                     .foregroundStyle(AppTheme.text.opacity(0.6))
                     .lineLimit(1)
             }
-            
+
             if unreadCount > 0 {
                 Circle()
                     .fill(AppTheme.accent)
@@ -402,6 +421,6 @@ private struct InboxRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color.clear) // To ensure tapping works everywhere
+        .background(Color.clear)
     }
 }

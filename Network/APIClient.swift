@@ -132,6 +132,10 @@ final class APIClient {
         case 200...299:
             return data
         case 401:
+            // Auth gerektirmeyen endpoint'lerde (login gibi) refresh deneme, doğrudan hata fırlat
+            guard requiresAuth else {
+                throw APIError.httpError(401, data)
+            }
             // Token süresi dolmuş → refresh et ve tekrar dene
             do {
                 let newToken = try await refreshAccessToken()

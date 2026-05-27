@@ -34,6 +34,8 @@ final class SessionStore: ObservableObject {
     // MARK: - UI State (opsiyonel)
 
     @Published var authErrorMessage: String? = nil
+    /// Login sırasında kayıtlı hesap bulunamazsa true (HTTP 404)
+    @Published var accountNotFound: Bool = false
 
 
     private let keychain = KeychainManager.shared
@@ -99,16 +101,21 @@ final class SessionStore: ObservableObject {
     // MARK: - Email Auth (Backend)
 
     /// Email + şifre ile giriş yapar.
-    func signIn(email: String, password: String, modelContext: ModelContext) {
-        Task {
-            do {
-                let resp = try await api.emailLogin(email: email, password: password)
-                try await saveTokensAndLoad(resp: resp, modelContext: modelContext)
-            } catch let error as APIError {
+    /// Caller bir Task içinde `await` ile çağırmalıdır.
+    func signIn(email: String, password: String, modelContext: ModelContext) async {
+        accountNotFound = false
+        authErrorMessage = nil
+        do {
+            let resp = try await api.emailLogin(email: email, password: password)
+            try await saveTokensAndLoad(resp: resp, modelContext: modelContext)
+        } catch let error as APIError {
+            if case .httpError(404, _) = error {
+                accountNotFound = true
+            } else {
                 authErrorMessage = emailAuthErrorMessage(error)
-            } catch {
-                authErrorMessage = error.localizedDescription
             }
+        } catch {
+            authErrorMessage = error.localizedDescription
         }
     }
 
@@ -134,8 +141,8 @@ final class SessionStore: ObservableObject {
     private func emailAuthErrorMessage(_ error: APIError) -> String {
         if case .httpError(let code, _) = error {
             switch code {
-            case 401: return "Email veya şifre hatalı."
-            case 409: return "Bu email zaten kayıtlı."
+            case 401: return "E-posta veya şifre hatalı."
+            case 409: return "Bu e-posta zaten kayıtlı."
             default: return "Sunucu hatası (\(code))"
             }
         }
@@ -149,6 +156,7 @@ final class SessionStore: ObservableObject {
         currentProfile = nil
         backendUser = nil
         authErrorMessage = nil
+        accountNotFound = false
         onboardingSkipped = false
         socialLoginName = ""
     }

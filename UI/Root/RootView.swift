@@ -16,11 +16,12 @@ struct RootView: View {
                 MainTabView()
             } else {
                 // Giriş yapıldı ama profil henüz oluşturulmadı → onboarding
-                let isSocial = backendAuthProvider != "email"
+                // isSocialLogin her zaman true: kullanıcı zaten auth oldu,
+                // email/şifre adımlarını tekrar göstermeye gerek yok.
                 NavigationStack {
                     SignUpFlowView(
-                        isSocialLogin: isSocial,
-                        prefillName: isSocial ? session.socialLoginName : ""
+                        isSocialLogin: true,
+                        prefillName: session.backendUser?.isim ?? session.socialLoginName
                     )
                 }
             }
@@ -32,8 +33,4 @@ struct RootView: View {
         }
     }
 
-    /// Backend kullanıcısının auth provider'ını döner
-    private var backendAuthProvider: String {
-        session.backendUser?.auth_provider ?? "email"  // optional → nil ise "email" varsay
-    }
 }
