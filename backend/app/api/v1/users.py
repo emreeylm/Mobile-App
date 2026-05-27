@@ -37,6 +37,21 @@ async def get_me(
     return await _get_or_404(db, user_id)
 
 
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_me(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Kullanıcı hesabını ve tüm ilgili verileri kalıcı olarak siler.
+    Eşleşmeler, mesajlar, medya bağlantıları CASCADE ile otomatik silinir.
+    Apple App Store zorunluluğu (iOS 15.4+).
+    """
+    async with db.begin():
+        k = await _get_or_404(db, user_id)
+        await db.delete(k)
+
+
 @router.patch("/me", response_model=KullaniciResponse)
 async def update_me(
     body: KullaniciGuncelle,

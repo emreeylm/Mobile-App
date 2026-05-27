@@ -149,6 +149,19 @@ final class SessionStore: ObservableObject {
         return error.localizedDescription
     }
 
+    /// Hesabı backend'de kalıcı olarak siler, ardından oturumu kapatır.
+    func deleteAccount(modelContext: ModelContext) async {
+        do {
+            try await api.deleteAccount()
+        } catch {
+            logger.error("deleteAccount API hatası: \(error) — yine de yerel oturum kapatılıyor")
+        }
+        // Yerel SwiftData verilerini temizle
+        try? modelContext.delete(model: Profile.self)
+        try? modelContext.save()
+        signOut()
+    }
+
     func signOut() {
         keychain.clearAll()
         isAuthed = false

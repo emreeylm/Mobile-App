@@ -4,11 +4,14 @@ struct SettingsView: View {
 
     @EnvironmentObject var session: SessionStore
     @EnvironmentObject var subscriptionStore: AppSubscriptionStore
-
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+
     @State private var showPaywall = false
     @State private var boostStatus: BoostStatusResponse? = nil
     @State private var isBoostLoading = false
+    @State private var showDeleteConfirm = false
+    @State private var isDeletingAccount = false
 
     var body: some View {
         NavigationStack {
@@ -69,7 +72,8 @@ struct SettingsView: View {
                         }
 
                         // Danger Zone
-                        Section {
+                        VStack(spacing: 12) {
+                            // Çıkış Yap
                             Button {
                                 session.signOut()
                             } label: {
@@ -86,9 +90,48 @@ struct SettingsView: View {
                                 .background(Color.red.opacity(0.1))
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
                             }
+
+                            // Hesabı Sil (Apple zorunluluğu)
+                            Button {
+                                showDeleteConfirm = true
+                            } label: {
+                                HStack {
+                                    if isDeletingAccount {
+                                        ProgressView().tint(.red)
+                                    } else {
+                                        Image(systemName: "trash.fill")
+                                            .foregroundColor(.red)
+                                    }
+                                    Text("Hesabı Kalıcı Olarak Sil")
+                                        .foregroundColor(.red)
+                                        .font(.system(size: 16, weight: .bold))
+                                    Spacer()
+                                }
+                                .padding(.vertical, 16)
+                                .padding(.horizontal, 20)
+                                .background(Color.red.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color.red.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                            .disabled(isDeletingAccount)
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 20)
+                        .alert("Hesabı Sil", isPresented: $showDeleteConfirm) {
+                            Button("Sil", role: .destructive) {
+                                isDeletingAccount = true
+                                Task {
+                                    await session.deleteAccount(modelContext: modelContext)
+                                    isDeletingAccount = false
+                                }
+                            }
+                            Button("İptal", role: .cancel) {}
+                        } message: {
+                            Text("Hesabın, eşleşmelerin ve tüm mesajların kalıcı olarak silinecek. Bu işlem geri alınamaz.")
+                        }
                     }
                     .padding(.bottom, 100)
                 }

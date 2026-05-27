@@ -38,11 +38,5 @@
 	<key>NSPhotoLibraryAddOnlyUsageDescription</key>
 	<string>Çekilen fotoğrafları galeriye kaydetmek için izin gerekli.</string>
 
-	<!-- Yerel geliştirme için HTTP'ye izin -->
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 </dict>
 </plist>

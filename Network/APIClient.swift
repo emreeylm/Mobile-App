@@ -222,6 +222,11 @@ extension APIClient {
         try await request("GET", path: "/api/v1/users/me")
     }
 
+    /// Hesabı ve tüm ilgili verileri kalıcı olarak siler. (Apple zorunluluğu)
+    func deleteAccount() async throws {
+        try await requestEmpty("DELETE", path: "/api/v1/users/me")
+    }
+
     func updateMe(_ body: UpdateUserRequest) async throws -> UserResponse {
         try await request("PATCH", path: "/api/v1/users/me", body: body)
     }
