@@ -1289,7 +1289,7 @@ struct SignUpFlowView: View {
             if Task.isCancelled { return }
             
             do {
-                logger.debug("TMDB search: type=\(type) query=\(query)")
+                logger.debug("TMDB search: type=\(type.rawValue) query=\(query)")
                 let results = try await TMDBService.shared.search(query: query, type: type)
                 if Task.isCancelled { return }
                 
