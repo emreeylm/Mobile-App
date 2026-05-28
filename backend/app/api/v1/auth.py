@@ -1,15 +1,25 @@
 """Auth endpoints: email/şifre + Apple/Google OAuth2 → JWT"""
+import os
+import secrets
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.dependencies import get_redis
 from app.core.security import create_access_token, create_refresh_token, decode_token
 from app.db.session import get_db
 from app.db.models import Kullanici
-from app.schemas.auth import EmailLoginRequest, EmailRegisterRequest, RefreshRequest, SocialAuthRequest, TokenResponse
+from app.schemas.auth import (
+    EmailLoginRequest, EmailRegisterRequest, ForgotPasswordRequest, ForgotPasswordResponse,
+    RefreshRequest, ResetPasswordRequest, ResetPasswordResponse, SocialAuthRequest, TokenResponse
+)
 from app.services import auth_service
 from app.services.password_service import hash_password, verify_password
+
+_PWD_RESET_TTL = 15 * 60  # 15 dakika (saniye)
+_DEMO_MODE = os.getenv("DEMO_RESET_TOKENS", "true").lower() == "true"  # prod'da false yap
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -144,3 +154,63 @@ async def refresh_token(body: RefreshRequest):
         refresh_token=create_refresh_token(user_id),
         is_new_user=False,
     )
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+):
+    """
+    Şifre sıfırlama token'ı üretir.
+    Production'da e-posta gönderilir; demo modda token doğrudan döner.
+    """
+    result = await db.execute(select(Kullanici).where(Kullanici.email == body.email.lower().strip()))
+    kullanici = result.scalar_one_or_none()
+
+    # Güvenlik: hesap yoksa da başarılı yanıt ver (kullanıcı keşfini önle)
+    if kullanici is None:
+        return ForgotPasswordResponse(sent=True, reset_token=None)
+
+    token = secrets.token_urlsafe(32)
+    redis_key = f"pwd:reset:{token}"
+    await redis.setex(redis_key, _PWD_RESET_TTL, str(kullanici.id))
+
+    # Demo modda token'ı direkt dön, production'da None dön (e-posta gönderilir)
+    return ForgotPasswordResponse(
+        sent=True,
+        reset_token=token if _DEMO_MODE else None,
+    )
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+async def reset_password(
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+):
+    """Token + yeni şifre ile şifre sıfırlar. Token 15 dakika geçerlidir."""
+    redis_key = f"pwd:reset:{body.token}"
+    user_id_str = await redis.get(redis_key)
+
+    if not user_id_str:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz veya süresi dolmuş sıfırlama kodu")
+
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz token")
+
+    result = await db.execute(select(Kullanici).where(Kullanici.id == user_id))
+    kullanici = result.scalar_one_or_none()
+    if not kullanici:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kullanıcı bulunamadı")
+
+    async with db.begin():
+        kullanici.password_hash = hash_password(body.new_password)
+
+    # Token tek kullanımlık — hemen sil
+    await redis.delete(redis_key)
+
+    return ResetPasswordResponse(success=True)

@@ -217,6 +217,18 @@ extension APIClient {
                           requiresAuth: false)
     }
 
+    func forgotPassword(email: String) async throws -> ForgotPasswordResponse {
+        try await request("POST", path: "/api/v1/auth/forgot-password",
+                          body: ForgotPasswordRequest(email: email),
+                          requiresAuth: false)
+    }
+
+    func resetPassword(token: String, newPassword: String) async throws -> ResetPasswordResponse {
+        try await request("POST", path: "/api/v1/auth/reset-password",
+                          body: ResetPasswordRequest(token: token, new_password: newPassword),
+                          requiresAuth: false)
+    }
+
     // User
     func getMe() async throws -> UserResponse {
         try await request("GET", path: "/api/v1/users/me")

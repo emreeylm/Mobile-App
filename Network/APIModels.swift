@@ -31,6 +31,24 @@ struct CheckEmailResponse: Decodable {
     let exists: Bool
 }
 
+struct ForgotPasswordRequest: Encodable {
+    let email: String
+}
+
+struct ForgotPasswordResponse: Decodable {
+    let sent: Bool
+    let reset_token: String?   // demo modda dolu, production'da nil
+}
+
+struct ResetPasswordRequest: Encodable {
+    let token: String
+    let new_password: String
+}
+
+struct ResetPasswordResponse: Decodable {
+    let success: Bool
+}
+
 // MARK: - User
 struct UserResponse: Decodable {
     let id: String

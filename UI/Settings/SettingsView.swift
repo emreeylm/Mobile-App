@@ -58,7 +58,7 @@ struct SettingsView: View {
                                     AboutView()
                                 }
                                 settingsRow(icon: "shield.lefthalf.filled", title: "Gizlilik Politikası") {
-                                    Text("Gizlilik Politikası").padding()
+                                    PrivacyPolicyView()
                                 }
                             }
                         }

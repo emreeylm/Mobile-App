@@ -43,6 +43,9 @@ struct RecommendationsView: View {
     @State private var showSuperlikeSheet = false
     @State private var superlikeMessage    = ""
 
+    // Eşleşme kutlama
+    @State private var matchedProfile: Profile? = nil
+
     var body: some View {
         VStack(spacing: 0) { // ✅ No vertical spacing
             // Üstteki Geri Al butonu kaldırıldı, karta taşındı
@@ -139,6 +142,23 @@ struct RecommendationsView: View {
             // Swipe limit overlay
             if showSwipeLimitPaywall {
                 swipeLimitOverlay
+            }
+
+            // Eşleşme kutlama tam ekran overlay
+            if let matched = matchedProfile {
+                MatchCelebrationView(
+                    profile: matched,
+                    myProfile: session.currentProfile,
+                    onSendMessage: {
+                        withAnimation { matchedProfile = nil }
+                        // Tab değişimi parent'ta yönetilmeli; burada sadece overlay kapat
+                    },
+                    onContinue: {
+                        withAnimation { matchedProfile = nil }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .zIndex(100)
             }
         }
         .fullScreenCover(isPresented: $showPremiumPaywall) {
@@ -276,6 +296,11 @@ struct RecommendationsView: View {
 
         if liked, let otherLike = mutualLike {
             createMatch(with: target, otherLike: otherLike)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    matchedProfile = target
+                }
+            }
         } else {
             let edge = LikeEdge(fromProfileId: me.id, toProfileId: target.id, isLike: liked, isSuperLike: isSuperLike)
             modelContext.insert(edge)
@@ -311,6 +336,14 @@ struct RecommendationsView: View {
                         let thread = ChatThread(myProfileId: me.id, otherProfileId: target.id)
                         modelContext.insert(m1); modelContext.insert(m2); modelContext.insert(thread)
                         try? modelContext.save()
+                        // Yerel eşleşme olmadıysa backend teyit edince kutla
+                        if matchedProfile?.id != target.id {
+                            await MainActor.run {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    matchedProfile = target
+                                }
+                            }
+                        }
                     }
                 }
             } catch let error as APIError {

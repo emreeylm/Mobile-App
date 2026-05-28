@@ -16,6 +16,7 @@ struct AuthLandingView: View {
     @State private var isGoogleLoading = false
     @State private var isEmailLoginLoading = false
     @State private var navigateToSignUp = false
+    @State private var showForgotPassword = false
     @State private var socialName: String = ""
     @State private var isSocialSignUp = false
 
@@ -55,6 +56,17 @@ struct AuthLandingView: View {
                             .textInputAutocapitalization(.never)
                             .modernInput(icon: "lock.fill")
                             .onChange(of: password) { _, _ in clearErrors() }
+
+                        // Şifremi Unuttum linki
+                        HStack {
+                            Spacer()
+                            Button { showForgotPassword = true } label: {
+                                Text("Şifremi Unuttum")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(AppTheme.accent)
+                            }
+                        }
+                        .padding(.top, -8)
 
                         // Hata ve durum mesajları
                         errorSection
@@ -159,6 +171,9 @@ struct AuthLandingView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showForgotPassword) {
+                ForgotPasswordView()
+            }
             .navigationDestination(isPresented: $navigateToSignUp) {
                 SignUpFlowView(
                     isSocialLogin: isSocialSignUp,
