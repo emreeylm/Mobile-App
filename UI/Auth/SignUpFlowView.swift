@@ -1160,8 +1160,14 @@ struct SignUpFlowView: View {
                 // burada sadece onboarding verisi gönderilir.
                 guard let uid = session.currentUserId else { return }
 
-                // 2. İsim güncelle (phone auth sırasında placeholder "Kullanıcı" atandı)
-                _ = try? await APIClient.shared.updateMe(UpdateUserRequest(isim: firstName))
+                // 2. Kullanıcı bilgilerini backend'e gönder
+                let age = Calendar.current.dateComponents([.year], from: birthday, to: .now).year ?? 18
+                _ = try? await APIClient.shared.updateMe(UpdateUserRequest(
+                    isim: firstName,
+                    yas: age,
+                    cinsiyet: gender.rawValue,
+                    hedef_cinsiyet: lookingFor.rawValue
+                ))
 
                 // 3. Seçilen medyayı backend'e gönder
                 let seriesItems = seriesSearchResults
