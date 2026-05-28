@@ -16,8 +16,7 @@ struct RootView: View {
                 MainTabView()
             } else {
                 // Giriş yapıldı ama profil henüz oluşturulmadı → onboarding
-                // isSocialLogin her zaman true: kullanıcı zaten auth oldu,
-                // email/şifre adımlarını tekrar göstermeye gerek yok.
+                // Kullanıcı phone OTP veya sosyal giriş ile zaten auth oldu.
                 NavigationStack {
                     SignUpFlowView(
                         isSocialLogin: true,
