@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # AdMob SSV
     ADMOB_SECRET_KEY: str = ""
 
+    # NetGSM SMS OTP (Türkiye)
+    NETGSM_USERCODE: str = ""    # NetGSM hesap kullanıcı adı
+    NETGSM_PASSWORD: str = ""    # NetGSM hesap şifresi
+    NETGSM_MSGHEADER: str = "BINGE"  # Onaylı SMS başlığı
+    OTP_DEMO_MODE: bool = True   # True → SMS göndermez, OTP'yi response'da döner (dev/test)
+
     # Fotoğraf depolama: "local" (disk) veya "s3" (AWS S3 / Supabase Storage / R2)
     STORAGE_BACKEND: str = "local"
     S3_BUCKET: str = ""

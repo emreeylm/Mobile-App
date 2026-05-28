@@ -1,38 +1,130 @@
-"""Auth endpoints: email/şifre + Apple/Google OAuth2 → JWT"""
-import os
-import secrets
+"""Auth endpoints: Telefon OTP + Apple/Google OAuth2 → JWT"""
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError
 from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.config import settings
 from app.core.dependencies import get_redis
 from app.core.security import create_access_token, create_refresh_token, decode_token
 from app.db.session import get_db
 from app.db.models import Kullanici
 from app.schemas.auth import (
-    EmailLoginRequest, EmailRegisterRequest, ForgotPasswordRequest, ForgotPasswordResponse,
-    RefreshRequest, ResetPasswordRequest, ResetPasswordResponse, SocialAuthRequest, TokenResponse
+    PhoneOTPRequest, PhoneOTPResponse, PhoneVerifyRequest,
+    RefreshRequest, SocialAuthRequest, TokenResponse
 )
 from app.services import auth_service
-from app.services.password_service import hash_password, verify_password
-
-_PWD_RESET_TTL = 15 * 60  # 15 dakika (saniye)
-_DEMO_MODE = os.getenv("DEMO_RESET_TOKENS", "true").lower() == "true"  # prod'da false yap
+from app.services.sms_service import generate_otp, send_otp_sms
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+_OTP_TTL = 120           # 2 dakika (saniye)
+_OTP_RATELIMIT_TTL = 60  # 1/dakika rate limit
+_OTP_DAILY_MAX = 5       # günlük max SMS
 
-@router.get("/check-email")
-async def check_email(email: str, db: AsyncSession = Depends(get_db)):
-    """Email adresinin kayıtlı olup olmadığını döner. Auth gerektirmez."""
-    result = await db.execute(
-        select(Kullanici).where(Kullanici.email == email.lower().strip())
+
+# MARK: - Telefon OTP
+
+@router.post("/phone/request-otp", response_model=PhoneOTPResponse)
+async def request_phone_otp(
+    body: PhoneOTPRequest,
+    redis: Redis = Depends(get_redis),
+):
+    """
+    Telefon numarasına 6 haneli OTP gönderir.
+    Rate limit: aynı numaraya 1/dk, günde max 5 SMS.
+    Demo modda SMS gönderilmez, OTP kodu response'da döner.
+    """
+    telefon = body.telefon.strip()
+
+    # Rate limit: 1/dakika
+    rl_key = f"otp:ratelimit:{telefon}"
+    if await redis.exists(rl_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Çok sık istek. 1 dakika bekleyip tekrar deneyin.",
+        )
+    await redis.setex(rl_key, _OTP_RATELIMIT_TTL, "1")
+
+    # Rate limit: günlük max
+    daily_key = f"otp:daily:{telefon}"
+    daily_count = await redis.get(daily_key)
+    if daily_count and int(daily_count) >= _OTP_DAILY_MAX:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Günlük SMS limitine ulaşıldı. Yarın tekrar deneyin.",
+        )
+    pipe = redis.pipeline()
+    pipe.incr(daily_key)
+    pipe.expire(daily_key, 86400)  # 24 saat TTL
+    await pipe.execute()
+
+    # OTP üret ve kaydet
+    otp = generate_otp()
+    await redis.setex(f"otp:{telefon}", _OTP_TTL, otp)
+
+    # SMS gönder (demo modda atlanır)
+    await send_otp_sms(telefon, otp)
+
+    return PhoneOTPResponse(
+        sent=True,
+        otp_code=otp if settings.OTP_DEMO_MODE else None,
     )
-    exists = result.scalar_one_or_none() is not None
-    return {"exists": exists}
 
+
+@router.post("/phone/verify-otp", response_model=TokenResponse)
+async def verify_phone_otp(
+    body: PhoneVerifyRequest,
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+):
+    """
+    OTP doğrular. Kullanıcı yoksa oluşturur (yeni kayıt), varsa giriş yapar.
+    is_new_user=true → iOS onboarding akışına yönlendirir.
+    """
+    telefon = body.telefon.strip()
+    stored_otp = await redis.get(f"otp:{telefon}")
+
+    if not stored_otp or stored_otp != body.otp_code.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Geçersiz veya süresi dolmuş doğrulama kodu.",
+        )
+
+    # Tek kullanımlık — hemen sil
+    await redis.delete(f"otp:{telefon}")
+
+    async with db.begin():
+        result = await db.execute(
+            select(Kullanici).where(Kullanici.telefon == telefon)
+        )
+        kullanici = result.scalar_one_or_none()
+        is_new = kullanici is None
+
+        if is_new:
+            kullanici = Kullanici(
+                telefon=telefon,
+                auth_provider="phone",
+                provider_id=f"phone:{telefon}",
+                isim="Kullanıcı",          # onboarding'de PATCH /users/me ile güncellenir
+                yas=18,
+                cinsiyet="belirtilmedi",
+                hedef_cinsiyet="belirtilmedi",
+                vip_bilet_bakiye=1,        # hoşgeldin bileti
+            )
+            db.add(kullanici)
+            await db.flush()
+
+    user_id = str(kullanici.id)
+    return TokenResponse(
+        access_token=create_access_token(user_id),
+        refresh_token=create_refresh_token(user_id),
+        is_new_user=is_new,
+    )
+
+
+# MARK: - Social (Apple / Google)
 
 @router.post("/social", response_model=TokenResponse)
 async def social_login(
@@ -62,14 +154,14 @@ async def social_login(
 
         if is_new:
             kullanici = Kullanici(
-                email=info["email"],
+                email=info.get("email"),
                 auth_provider=body.provider,
                 provider_id=info["sub"],
-                isim=info.get("name") or info["email"].split("@")[0],
+                isim=info.get("name") or (info.get("email") or "Kullanıcı").split("@")[0],
                 yas=18,
                 cinsiyet="belirtilmedi",
                 hedef_cinsiyet="belirtilmedi",
-                vip_bilet_bakiye=1,  # Hoşgeldin bileti
+                vip_bilet_bakiye=1,
             )
             db.add(kullanici)
             await db.flush()
@@ -82,61 +174,7 @@ async def social_login(
     )
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def email_register(
-    body: EmailRegisterRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """Email + şifre ile yeni hesap oluşturur."""
-    async with db.begin():
-        existing = await db.execute(select(Kullanici).where(Kullanici.email == body.email))
-        if existing.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bu email zaten kayıtlı")
-
-        kullanici = Kullanici(
-            email=body.email,
-            auth_provider="email",
-            provider_id=f"email:{body.email}",
-            isim=body.isim,
-            yas=18,
-            cinsiyet="belirtilmedi",
-            hedef_cinsiyet="belirtilmedi",
-            password_hash=hash_password(body.password),
-            vip_bilet_bakiye=1,  # Hoşgeldin bileti
-        )
-        db.add(kullanici)
-        await db.flush()
-
-    user_id = str(kullanici.id)
-    return TokenResponse(
-        access_token=create_access_token(user_id),
-        refresh_token=create_refresh_token(user_id),
-        is_new_user=True,
-    )
-
-
-@router.post("/login", response_model=TokenResponse)
-async def email_login(
-    body: EmailLoginRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """Email + şifre ile giriş yapar."""
-    result = await db.execute(select(Kullanici).where(Kullanici.email == body.email))
-    kullanici = result.scalar_one_or_none()
-
-    if not kullanici or not kullanici.password_hash:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bu e-postaya kayıtlı hesap bulunamadı")
-
-    if not verify_password(body.password, kullanici.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-posta veya şifre hatalı")
-
-    user_id = str(kullanici.id)
-    return TokenResponse(
-        access_token=create_access_token(user_id),
-        refresh_token=create_refresh_token(user_id),
-        is_new_user=False,
-    )
-
+# MARK: - Token Refresh
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(body: RefreshRequest):
@@ -154,63 +192,3 @@ async def refresh_token(body: RefreshRequest):
         refresh_token=create_refresh_token(user_id),
         is_new_user=False,
     )
-
-
-@router.post("/forgot-password", response_model=ForgotPasswordResponse)
-async def forgot_password(
-    body: ForgotPasswordRequest,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-):
-    """
-    Şifre sıfırlama token'ı üretir.
-    Production'da e-posta gönderilir; demo modda token doğrudan döner.
-    """
-    result = await db.execute(select(Kullanici).where(Kullanici.email == body.email.lower().strip()))
-    kullanici = result.scalar_one_or_none()
-
-    # Güvenlik: hesap yoksa da başarılı yanıt ver (kullanıcı keşfini önle)
-    if kullanici is None:
-        return ForgotPasswordResponse(sent=True, reset_token=None)
-
-    token = secrets.token_urlsafe(32)
-    redis_key = f"pwd:reset:{token}"
-    await redis.setex(redis_key, _PWD_RESET_TTL, str(kullanici.id))
-
-    # Demo modda token'ı direkt dön, production'da None dön (e-posta gönderilir)
-    return ForgotPasswordResponse(
-        sent=True,
-        reset_token=token if _DEMO_MODE else None,
-    )
-
-
-@router.post("/reset-password", response_model=ResetPasswordResponse)
-async def reset_password(
-    body: ResetPasswordRequest,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-):
-    """Token + yeni şifre ile şifre sıfırlar. Token 15 dakika geçerlidir."""
-    redis_key = f"pwd:reset:{body.token}"
-    user_id_str = await redis.get(redis_key)
-
-    if not user_id_str:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz veya süresi dolmuş sıfırlama kodu")
-
-    try:
-        user_id = uuid.UUID(user_id_str)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz token")
-
-    result = await db.execute(select(Kullanici).where(Kullanici.id == user_id))
-    kullanici = result.scalar_one_or_none()
-    if not kullanici:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kullanıcı bulunamadı")
-
-    async with db.begin():
-        kullanici.password_hash = hash_password(body.new_password)
-
-    # Token tek kullanımlık — hemen sil
-    await redis.delete(redis_key)
-
-    return ResetPasswordResponse(success=True)

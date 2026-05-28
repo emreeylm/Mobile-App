@@ -6,15 +6,8 @@ class SocialAuthRequest(BaseModel):
     id_token: str
 
 
-class EmailRegisterRequest(BaseModel):
-    email: EmailStr
-    password: str
-    isim: str
-
-
-class EmailLoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class TokenResponse(BaseModel):
@@ -24,24 +17,18 @@ class TokenResponse(BaseModel):
     is_new_user: bool
 
 
-class RefreshRequest(BaseModel):
-    refresh_token: str
+# MARK: - Telefon OTP Auth
+
+class PhoneOTPRequest(BaseModel):
+    telefon: str   # E.164: +905xxxxxxxxx
 
 
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-
-class ForgotPasswordResponse(BaseModel):
+class PhoneOTPResponse(BaseModel):
     sent: bool
-    # Demo modda reset kodu döner (production'da e-postayla gönderilir)
-    reset_token: str | None = None
+    # Demo modda OTP kodu döner (production'da None)
+    otp_code: str | None = None
 
 
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
-
-
-class ResetPasswordResponse(BaseModel):
-    success: bool
+class PhoneVerifyRequest(BaseModel):
+    telefon: str
+    otp_code: str

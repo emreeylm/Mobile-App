@@ -12,7 +12,7 @@ Bu dosya Claude Code için proje bağlamı (context) sağlar. Yeni bir oturum ba
 - **Backend:** Python & FastAPI (async/await)
 - **DB:** PostgreSQL + PostGIS uzantısı
 - **Cache:** Redis
-- **Dış API'lar:** TMDB, AdMob/AppLovin, Sign in with Apple, Google OAuth2
+- **Dış API'lar:** TMDB, AdMob/AppLovin, Sign in with Apple, Google OAuth2, NetGSM (SMS OTP)
 
 ---
 
@@ -86,8 +86,9 @@ binge-date/
 -- Kullanıcılar
 CREATE TABLE tbl_kullanicilar (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email             VARCHAR(255) UNIQUE NOT NULL,
-    auth_provider     VARCHAR(50) NOT NULL,          -- 'apple' | 'google' | 'email'
+    email             VARCHAR(255) UNIQUE,            -- nullable: telefon auth kullanıcılarında yok
+    telefon           VARCHAR(20) UNIQUE,             -- E.164 (+905xxxxxxxxx): telefon OTP kullanıcıları
+    auth_provider     VARCHAR(50) NOT NULL,          -- 'apple' | 'google' | 'phone'
     provider_id       VARCHAR(255) UNIQUE NOT NULL,
     isim              VARCHAR(100) NOT NULL,
     yas               INT NOT NULL,
@@ -97,7 +98,7 @@ CREATE TABLE tbl_kullanicilar (
     now_watching      VARCHAR(255),
     is_premium        BOOLEAN NOT NULL DEFAULT FALSE,
     is_admin          BOOLEAN NOT NULL DEFAULT FALSE, -- /reports admin endpoint koruması
-    password_hash     VARCHAR(255),                   -- e-posta/şifre girişi için (nullable)
+    password_hash     VARCHAR(255),                   -- kullanılmıyor (backward compat için kolon kalıyor)
     turler            VARCHAR(512),                   -- onboarding'de seçilen türler (virgülle ayrılmış)
     vip_bilet_bakiye  INTEGER NOT NULL DEFAULT 0,     -- VIP bilet bakiyesi (PostgreSQL'de tutulur)
     kayit_tarihi      TIMESTAMP NOT NULL DEFAULT NOW()
@@ -193,13 +194,23 @@ async def consume_vip_ticket(db: AsyncSession, user_id: str) -> bool:
 
 Yeni kullanıcı kaydında `vip_bilet_bakiye=1` constructor'da set edilir (hoşgeldin bileti).
 
-### 4. OAuth2 → JWT Akışı (/api/v1/auth/social)
+### 4. Auth Akışları
 
+**Telefon OTP (`/api/v1/auth/phone/`)**
+1. `POST /auth/phone/request-otp` → 6 haneli OTP üretilir, Redis'e 120 sn TTL ile yazılır, NetGSM ile gönderilir.
+   - Demo mod (`OTP_DEMO_MODE=true`): OTP response'da döner (gerçek SMS gönderilmez).
+   - Rate limit: `otp:ratelimit:{telefon}` 1/dk, `otp:daily:{telefon}` max 5/gün.
+2. `POST /auth/phone/verify-otp` → Redis'teki OTP doğrulanır, kullanıcı DB'de yoksa oluşturulur.
+3. Yeni kullanıcı: `isim="Kullanıcı"`, `yas=18`, `cinsiyet="belirtilmedi"` → onboarding'de güncellenir.
+4. `access_token` (15 dk) + `refresh_token` (30 gün) + `is_new_user` döner.
+
+**Sosyal Giriş (`/api/v1/auth/social`)**
 1. iOS'tan gelen `id_token` (Apple/Google) alınır.
 2. Provider'ın public key'i ile imza doğrulanır.
-3. `provider_id` ile DB'de kullanıcı aranır; yoksa yeni kayıt oluşturulur ve onboarding flag'i döner.
-4. `access_token` (15 dk) + `refresh_token` (30 gün) JWT çifti döner.
-5. iOS bu tokenları **Keychain**'de saklar; her API isteğinde `Authorization: Bearer <token>` kullanır.
+3. `provider_id` ile DB'de kullanıcı aranır; yoksa yeni kayıt oluşturulur.
+4. `access_token` + `refresh_token` + `is_new_user` döner.
+
+**Ortak kural:** iOS tokenları **Keychain**'de saklar; her API isteğinde `Authorization: Bearer <token>` kullanır.
 
 ### 5. Onboarding Validasyonu
 
@@ -244,6 +255,12 @@ REFRESH_TOKEN_EXPIRE_DAYS=30
 # TMDB
 TMDB_API_KEY=<tmdb-key>
 TMDB_BASE_URL=https://api.themoviedb.org/3
+
+# NetGSM (SMS OTP)
+NETGSM_USERCODE=<netgsm_kullanici_adi>
+NETGSM_PASSWORD=<netgsm_sifre>
+NETGSM_MSGHEADER=BINGE
+OTP_DEMO_MODE=true       # true=SMS gönderilmez, OTP response'da döner (App Store review için)
 
 # Google OAuth
 GOOGLE_CLIENT_ID=<google-client-id>

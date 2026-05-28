@@ -6,17 +6,6 @@ struct SocialAuthRequest: Encodable {
     let id_token: String
 }
 
-struct EmailRegisterRequest: Encodable {
-    let email: String
-    let password: String
-    let isim: String
-}
-
-struct EmailLoginRequest: Encodable {
-    let email: String
-    let password: String
-}
-
 struct RefreshRequest: Encodable {
     let refresh_token: String
 }
@@ -27,26 +16,19 @@ struct TokenResponse: Decodable {
     let is_new_user: Bool
 }
 
-struct CheckEmailResponse: Decodable {
-    let exists: Bool
+// MARK: - Telefon OTP Auth
+struct PhoneOTPRequest: Encodable {
+    let telefon: String   // E.164: +905xxxxxxxxx
 }
 
-struct ForgotPasswordRequest: Encodable {
-    let email: String
-}
-
-struct ForgotPasswordResponse: Decodable {
+struct PhoneOTPResponse: Decodable {
     let sent: Bool
-    let reset_token: String?   // demo modda dolu, production'da nil
+    let otp_code: String?   // demo modda dolu, production'da nil
 }
 
-struct ResetPasswordRequest: Encodable {
-    let token: String
-    let new_password: String
-}
-
-struct ResetPasswordResponse: Decodable {
-    let success: Bool
+struct PhoneVerifyRequest: Encodable {
+    let telefon: String
+    let otp_code: String
 }
 
 // MARK: - User

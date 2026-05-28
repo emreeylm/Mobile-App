@@ -9,30 +9,25 @@ struct SignUpFlowView: View {
     @EnvironmentObject var session: SessionStore
     @Environment(\.dismiss) private var dismiss
 
-    // Sosyal giriş (Google/Apple) ile gelindiyse email+şifre adımları atlanır
-    let isSocialLogin: Bool
+    let isSocialLogin: Bool   // Apple/Google için true (prefillName kullanılır)
     let prefillName: String
     /// İlk adımda geri butonuna basılınca çağrılır (nil ise @Environment dismiss kullanılır)
     var onBack: (() -> Void)? = nil
 
-    // Step control — sosyal girişte 1 ve 2. adımlar (email, şifre) atlanır
+    // Step control — 1'den başlar (nameStep)
     @State private var step: Int
-    private let totalSteps = 19
+    private let totalSteps = 17
 
     // DATA
-    @State private var email: String = ""
-    @State private var password: String = ""
     @State private var firstName: String
 
-    init(isSocialLogin: Bool = false, prefillName: String = "", initialEmail: String = "", onBack: (() -> Void)? = nil) {
+    init(isSocialLogin: Bool = false, prefillName: String = "", onBack: (() -> Void)? = nil) {
         self.isSocialLogin = isSocialLogin
         self.prefillName = prefillName
         self.onBack = onBack
-        _step = State(initialValue: isSocialLogin ? 3 : 1)
+        _step = State(initialValue: 1)
         _firstName = State(initialValue: prefillName)
-        _email = State(initialValue: initialEmail)
     }
-    @State private var isCheckingEmail = false
     private let logger = Logger(subsystem: "com.bingedate", category: "SignUpFlow")
     @State private var city: String = ""
     @State private var birthday: Date = Calendar.current.date(byAdding: .year, value: -20, to: .now) ?? .now
@@ -95,25 +90,23 @@ struct SignUpFlowView: View {
                 // Active Step
                 ZStack {
                     switch step {
-                    case 1: emailStep
-                    case 2: passwordStep
-                    case 3: nameStep
-                    case 4: cityStep
-                    case 5: locationStep
-                    case 6: photoStep
-                    case 7: birthdayStep
-                    case 8: genderStep
-                    case 9: lookingForStep
-                    case 10: movieStep
-                    case 11: seriesStep
-                    case 12: genreStep
-                    case 13: interestStep
-                    case 14: heightStep
-                    case 15: aboutStep
-                    case 16: smokingStep
-                    case 17: alcoholStep
-                    case 18: universityStep
-                    case 19: nowWatchingStep
+                    case 1:  nameStep
+                    case 2:  cityStep
+                    case 3:  locationStep
+                    case 4:  photoStep
+                    case 5:  birthdayStep
+                    case 6:  genderStep
+                    case 7:  lookingForStep
+                    case 8:  movieStep
+                    case 9:  seriesStep
+                    case 10: genreStep
+                    case 11: interestStep
+                    case 12: heightStep
+                    case 13: aboutStep
+                    case 14: smokingStep
+                    case 15: alcoholStep
+                    case 16: universityStep
+                    case 17: nowWatchingStep
                     default: EmptyView()
                     }
                 }
@@ -146,14 +139,11 @@ struct SignUpFlowView: View {
         VStack(spacing: 12) {
             HStack {
                 Button {
-                    let firstStep = isSocialLogin ? 3 : 1
-                    if step > firstStep {
+                    if step > 1 {
                         withAnimation { step -= 1 }
-                    } else if isSocialLogin {
-                        // Sosyal girişte ilk adımda geri → oturumu kapat, giriş sayfasına dön
-                        session.signOut()
                     } else {
-                        // onBack varsa onu çağır (AuthLandingView binding'ini sıfırlar), yoksa dismiss
+                        // İlk adımda geri → oturumu kapat, giriş ekranına dön
+                        session.signOut()
                         if let onBack { onBack() } else { dismiss() }
                     }
                 } label: {
@@ -165,7 +155,7 @@ struct SignUpFlowView: View {
                 Spacer()
                 
                 // Atla (Skip) Button for specific steps
-                if [14, 15, 16, 17, 18, 19].contains(step) {
+                if [12, 13, 14, 15, 16, 17].contains(step) {
                     Button("Atla") {
                         withAnimation {
                             if step == totalSteps { finishSignUp() }
@@ -199,54 +189,6 @@ struct SignUpFlowView: View {
 
     // MARK: - STEPS
 
-    private var emailStep: some View {
-        stepContainer(
-            title: "E-postan nedir?",
-            subtitle: "Hesabını oluşturmak için geçerli bir e-posta adresi gir.",
-            isLoading: isCheckingEmail
-        ) {
-            TextField("ornek@mail.com", text: $email)
-                .keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .setupTextFieldStyle()
-        } nextAction: {
-            let e = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            guard e.contains("@") && e.contains(".") else {
-                fail("Lütfen geçerli bir e-posta adresi gir.")
-                return
-            }
-            isCheckingEmail = true
-            Task {
-                defer { isCheckingEmail = false }
-                do {
-                    let resp = try await APIClient.shared.checkEmail(e)
-                    if resp.exists {
-                        fail("Bu e-posta zaten kayıtlı.\nGiriş yapmayı deneyin.")
-                    } else {
-                        withAnimation { step = 2 }
-                    }
-                } catch {
-                    // Ağ hatası veya backend ulaşılamıyor → devam et (register'da yine kontrol edilir)
-                    withAnimation { step = 2 }
-                }
-            }
-        }
-    }
-
-    private var passwordStep: some View {
-        stepContainer(
-            title: "Şifre oluştur",
-            subtitle: "Hesabının güvenliği için en az 6 karakterli bir şifre belirle."
-        ) {
-            SecureField("••••••", text: $password)
-                .setupTextFieldStyle()
-        } nextAction: {
-            if password.count >= 6 { withAnimation { step = 3 } }
-            else { fail("Şifreniz en az 6 karakter olmalıdır.") }
-        }
-    }
-
     private var nameStep: some View {
         stepContainer(
             title: "👋 Adın ne?",
@@ -255,7 +197,7 @@ struct SignUpFlowView: View {
             TextField("Adınız", text: $firstName)
                 .setupTextFieldStyle()
         } nextAction: {
-            if !firstName.isEmpty { withAnimation { step = 4 } }
+            if !firstName.isEmpty { withAnimation { step = 2 } }
             else { fail("Lütfen adınızı girin.") }
         }
     }
@@ -304,7 +246,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if photos.count >= minPhotos { withAnimation { step = 7 } }
+            if photos.count >= minPhotos { withAnimation { step = 5 } }
             else { fail("Lütfen en az \(minPhotos) fotoğraf yükleyin.") }
         }
     }
@@ -320,7 +262,7 @@ struct SignUpFlowView: View {
                 .preferredColorScheme(.dark)
                 .colorMultiply(.white) // Ensure white text on dark bg
         } nextAction: {
-            withAnimation { step = 8 }
+            withAnimation { step = 6 }
         }
     }
 
@@ -337,7 +279,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 9 }
+            withAnimation { step = 7 }
         }
     }
 
@@ -352,7 +294,7 @@ struct SignUpFlowView: View {
                 selectionRow(title: "Erkekler", isSelected: lookingFor == .male) { lookingFor = .male }
             }
         } nextAction: {
-            withAnimation { step = 10 }
+            withAnimation { step = 8 }
         }
     }
 
@@ -399,7 +341,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedMovieIds.count >= minSelection { withAnimation { step = 11 } }
+            if selectedMovieIds.count >= minSelection { withAnimation { step = 9 } }
             else { fail("Lütfen en az \(minSelection) film seçin.") }
         }
         .onAppear {
@@ -455,7 +397,7 @@ struct SignUpFlowView: View {
                 if total > 20 {
                     fail("Seçilen film ve dizi toplamı en fazla 20 olabilir. Şu an: \(total)")
                 } else {
-                    withAnimation { step = 12 }
+                    withAnimation { step = 10 }
                 }
             } else {
                 fail("Lütfen en az \(minSelection) dizi seçin.")
@@ -489,7 +431,7 @@ struct SignUpFlowView: View {
                 )
             }
         } nextAction: {
-            if selectedGenres.count >= minGenres { withAnimation { step = 13 } }
+            if selectedGenres.count >= minGenres { withAnimation { step = 11 } }
             else { fail("Lütfen en az \(minGenres) tür seçin.") }
         }
     }
@@ -571,7 +513,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedInterests.count >= minInterests { withAnimation { step = 14 } }
+            if selectedInterests.count >= minInterests { withAnimation { step = 12 } }
             else { fail("Lütfen en az \(minInterests) ilgi alanı seçin. (maks \(maxInterests))") }
         }
     }
@@ -608,7 +550,7 @@ struct SignUpFlowView: View {
                 .clipShape(Capsule())
             }
         } nextAction: {
-            withAnimation { step = 15 }
+            withAnimation { step = 13 }
         }
     }
 
@@ -629,7 +571,7 @@ struct SignUpFlowView: View {
                 )
                 .foregroundColor(AppTheme.text)
         } nextAction: {
-            withAnimation { step = 16 }
+            withAnimation { step = 14 }
         }
     }
 
@@ -647,7 +589,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 17 }
+            withAnimation { step = 15 }
         }
     }
 
@@ -665,7 +607,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 18 }
+            withAnimation { step = 16 }
         }
     }
 
@@ -677,7 +619,7 @@ struct SignUpFlowView: View {
             CityPickerView(selectedCity: $city)
         } nextAction: {
             if !city.isEmpty {
-                withAnimation { step = 5 }
+                withAnimation { step = 3 }
             } else {
                 fail("Lütfen şehrinizi seçin.")
             }
@@ -707,7 +649,7 @@ struct SignUpFlowView: View {
             LocationManager.shared.requestPermission()
             // Sistem diyaloğunun kapanmasına zaman tanı, sonra bir sonraki adıma geç
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                withAnimation { step = 6 }
+                withAnimation { step = 4 }
             }
         }
     }
@@ -736,7 +678,7 @@ struct SignUpFlowView: View {
             TextField("Üniversite adı", text: $university)
                 .setupTextFieldStyle()
         } nextAction: {
-            withAnimation { step = 19 }
+            withAnimation { step = 17 }
         }
     }
 
@@ -1164,14 +1106,14 @@ struct SignUpFlowView: View {
         Task { @MainActor in
             defer { isSubmitting = false }
             do {
-                // 1. Kayıt ol ve token al
-                // Sosyal girişte (Google/Apple) hesap zaten oluşturuldu, bu adım atlanır
-                if !isSocialLogin {
-                    try await session.signUp(email: email, password: password, isim: firstName, modelContext: modelContext)
-                }
+                // Hesap phone OTP veya sosyal giriş ile zaten oluşturuldu;
+                // burada sadece onboarding verisi gönderilir.
                 guard let uid = session.currentUserId else { return }
 
-                // 2. Seçilen medyayı backend'e gönder
+                // 2. İsim güncelle (phone auth sırasında placeholder "Kullanıcı" atandı)
+                _ = try? await APIClient.shared.updateMe(UpdateUserRequest(isim: firstName))
+
+                // 3. Seçilen medyayı backend'e gönder
                 let seriesItems = seriesSearchResults
                     .filter { selectedSeriesIds.contains("\($0.id)") }
                     .map { OnboardingMediaItem(id: $0.id, baslik: $0.displayName, tip: "tv", afis_url: $0.posterURL) }
@@ -1253,11 +1195,7 @@ struct SignUpFlowView: View {
                 session.setCurrentProfile(profile)
 
             } catch let error as APIError {
-                if case .httpError(409, _) = error {
-                    fail("Bu e-posta adresi zaten kullanılıyor.\nGiriş yapmayı deneyin.")
-                } else {
-                    fail(error.localizedDescription ?? "Kayıt sırasında bir hata oluştu.")
-                }
+                fail(error.localizedDescription ?? "Kayıt sırasında bir hata oluştu.")
             } catch {
                 fail(error.localizedDescription)
             }

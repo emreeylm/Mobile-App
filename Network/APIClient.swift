@@ -199,33 +199,15 @@ extension APIClient {
                           requiresAuth: false)
     }
 
-    func checkEmail(_ email: String) async throws -> CheckEmailResponse {
-        try await request("GET", path: "/api/v1/auth/check-email",
-                          queryItems: [URLQueryItem(name: "email", value: email)],
+    func requestPhoneOTP(telefon: String) async throws -> PhoneOTPResponse {
+        try await request("POST", path: "/api/v1/auth/phone/request-otp",
+                          body: PhoneOTPRequest(telefon: telefon),
                           requiresAuth: false)
     }
 
-    func emailRegister(email: String, password: String, isim: String) async throws -> TokenResponse {
-        try await request("POST", path: "/api/v1/auth/register",
-                          body: EmailRegisterRequest(email: email, password: password, isim: isim),
-                          requiresAuth: false)
-    }
-
-    func emailLogin(email: String, password: String) async throws -> TokenResponse {
-        try await request("POST", path: "/api/v1/auth/login",
-                          body: EmailLoginRequest(email: email, password: password),
-                          requiresAuth: false)
-    }
-
-    func forgotPassword(email: String) async throws -> ForgotPasswordResponse {
-        try await request("POST", path: "/api/v1/auth/forgot-password",
-                          body: ForgotPasswordRequest(email: email),
-                          requiresAuth: false)
-    }
-
-    func resetPassword(token: String, newPassword: String) async throws -> ResetPasswordResponse {
-        try await request("POST", path: "/api/v1/auth/reset-password",
-                          body: ResetPasswordRequest(token: token, new_password: newPassword),
+    func verifyPhoneOTP(telefon: String, otpCode: String) async throws -> TokenResponse {
+        try await request("POST", path: "/api/v1/auth/phone/verify-otp",
+                          body: PhoneVerifyRequest(telefon: telefon, otp_code: otpCode),
                           requiresAuth: false)
     }
 
