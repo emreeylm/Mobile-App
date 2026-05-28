@@ -983,15 +983,16 @@ struct SignUpFlowView: View {
                     if isSelected {
                         RoundedRectangle(cornerRadius: 20)
                             .stroke(AppTheme.accent, lineWidth: 3)
-                        
+
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 28))
+                            .font(.system(size: 26))
                             .foregroundStyle(AppTheme.accent)
                             .background(Circle().fill(.black).padding(2))
-                            .offset(x: 10, y: -10)
+                            .padding(6)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }
                 }
+                .aspectRatio(2/3, contentMode: .fit)
                 Text(result.displayName)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(isSelected ? AppTheme.accent : AppTheme.text)

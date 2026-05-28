@@ -174,8 +174,8 @@ struct DiscoverView: View {
                                             .foregroundColor(AppTheme.text.opacity(0.2))
                                     }
                                 }
-                                .frame(maxWidth: .infinity)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .clipped()
                             }
 
                             // Kaldır butonu
@@ -185,11 +185,12 @@ struct DiscoverView: View {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 22))
                                     .foregroundColor(.white)
-                                    .shadow(radius: 2)
+                                    .shadow(color: .black.opacity(0.6), radius: 3, x: 0, y: 1)
                                     .padding(6)
                             }
                         }
                         .frame(height: 130)
+                        .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 14))
 
                         Text(item.title)
