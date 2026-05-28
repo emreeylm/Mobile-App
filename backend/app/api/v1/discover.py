@@ -20,6 +20,8 @@ async def discover(
     min_age: int | None = Query(None),
     max_age: int | None = Query(None),
     max_distance_km: int | None = Query(None),
+    min_boy: int | None = Query(None),   # Premium: min boy filtresi (cm)
+    max_boy: int | None = Query(None),   # Premium: max boy filtresi (cm)
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
@@ -44,6 +46,8 @@ async def discover(
         min_age_override=min_age if me.is_premium else None,
         max_age_override=max_age if me.is_premium else None,
         max_distance_km_override=max_distance_km if me.is_premium else None,
+        min_boy_override=min_boy if me.is_premium else None,
+        max_boy_override=max_boy if me.is_premium else None,
     )
 
     # Boost aktif olan kullanıcıları sıranın başına al

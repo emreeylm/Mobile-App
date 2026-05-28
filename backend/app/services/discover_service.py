@@ -16,6 +16,8 @@ async def get_discover_feed(
     min_age_override: int | None = None,
     max_age_override: int | None = None,
     max_distance_km_override: int | None = None,
+    min_boy_override: int | None = None,
+    max_boy_override: int | None = None,
 ) -> list[dict]:
     """
     Uyumlu kullanıcıları ortak medya sayısına göre sıralar.
@@ -41,6 +43,15 @@ async def get_discover_feed(
         else "AND ST_DistanceSphere(hedef.konum, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)) <= :mesafe_limit"
     )
 
+    # Boy filtresi (premium): boy_gizli=True olan kullanıcılar da dahil, sadece boy değeri aralıkta olanlar
+    boy_filtre = ""
+    if min_boy_override is not None or max_boy_override is not None:
+        boy_filtre = "AND hedef.boy IS NOT NULL"
+        if min_boy_override is not None:
+            boy_filtre += " AND hedef.boy >= :min_boy"
+        if max_boy_override is not None:
+            boy_filtre += " AND hedef.boy <= :max_boy"
+
     # Engellenen / engelleyen kullanıcıları her iki yönde filtrele
     engel_filtre = """
           AND hedef.id::text NOT IN (
@@ -56,6 +67,8 @@ async def get_discover_feed(
             hedef.isim,
             hedef.yas,
             hedef.now_watching,
+            hedef.boy,
+            hedef.boy_gizli,
             COUNT(ortak.medya_id) AS uyumluluk_skoru,
             (
                 SELECT m2.afis_url
@@ -85,6 +98,7 @@ async def get_discover_feed(
           AND hedef.id != :user_id
           AND hedef.konum IS NOT NULL
           {mesafe_filtre}
+          {boy_filtre}
           {engel_filtre}
           AND hedef.id::text NOT IN (
               SELECT alici_id::text FROM tbl_eslesmeler WHERE gonderen_id = :user_id
@@ -92,7 +106,7 @@ async def get_discover_feed(
           AND ortak.medya_id IN (
               SELECT medya_id FROM tbl_kullanici_medya WHERE kullanici_id = :user_id
           )
-        GROUP BY hedef.id, hedef.isim, hedef.yas, hedef.now_watching
+        GROUP BY hedef.id, hedef.isim, hedef.yas, hedef.now_watching, hedef.boy, hedef.boy_gizli
         ORDER BY uyumluluk_skoru DESC
         LIMIT 50
     """)
@@ -107,6 +121,10 @@ async def get_discover_feed(
     }
     if mesafe_limit is not None:
         params["mesafe_limit"] = mesafe_limit
+    if min_boy_override is not None:
+        params["min_boy"] = min_boy_override
+    if max_boy_override is not None:
+        params["max_boy"] = max_boy_override
 
     result = await db.execute(sql, params)
     rows = result.mappings().all()
@@ -116,5 +134,9 @@ async def get_discover_feed(
         # ortak_medya_list → liste dönüşümü
         raw_list = d.pop("ortak_medya_list", None)
         d["ortak_medya"] = [s.strip() for s in raw_list.split(",")] if raw_list else []
+        # boy_gizli=True ise boy'u gizle (filtreleme çalışır ama kart'ta gösterilmez)
+        boy_gizli = d.pop("boy_gizli", False)
+        if boy_gizli:
+            d["boy"] = None
         out.append(d)
     return out

@@ -27,6 +27,8 @@ class Kullanici(Base):
     kayit_tarihi: Mapped[datetime] = mapped_column(server_default=func.now())
     turler: Mapped[str | None] = mapped_column(String(512), nullable=True)
     vip_bilet_bakiye: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    boy: Mapped[int | None] = mapped_column(Integer, nullable=True)              # cm cinsinden boy (opsiyonel)
+    boy_gizli: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # True → profilinde gösterilmez
 
     medyalar: Mapped[list["KullaniciMedya"]] = relationship(back_populates="kullanici", cascade="all, delete-orphan")
 

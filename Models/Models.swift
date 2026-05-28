@@ -43,6 +43,7 @@ final class Profile {
     // New fields
     var birthday: Date?
     var height: String = "170 cm"
+    var showHeight: Bool = true
     var smokingHabit: String = "Söylemek istemiyorum"
     var alcoholHabit: String = "Söylemek istemiyorum"
     var university: String = ""

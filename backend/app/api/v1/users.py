@@ -77,6 +77,15 @@ async def update_me(
             k.now_watching = body.now_watching
         if body.konum is not None:
             k.konum = ST_SetSRID(ST_MakePoint(body.konum.lon, body.konum.lat), 4326)
+        if body.boy is not None:
+            if body.boy < 100 or body.boy > 250:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Boy 100-250 cm arasında olmalıdır.",
+                )
+            k.boy = body.boy
+        if body.boy_gizli is not None:
+            k.boy_gizli = body.boy_gizli
     return k
 
 

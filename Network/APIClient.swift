@@ -225,7 +225,9 @@ extension APIClient {
         globalMod: Bool = false,
         minAge: Int? = nil,
         maxAge: Int? = nil,
-        maxDistanceKm: Int? = nil
+        maxDistanceKm: Int? = nil,
+        minBoy: Int? = nil,
+        maxBoy: Int? = nil
     ) async throws -> DiscoverResponse {
         var items = [
             URLQueryItem(name: "lat", value: "\(lat)"),
@@ -235,6 +237,8 @@ extension APIClient {
         if let minAge { items.append(URLQueryItem(name: "min_age", value: "\(minAge)")) }
         if let maxAge { items.append(URLQueryItem(name: "max_age", value: "\(maxAge)")) }
         if let maxDistanceKm { items.append(URLQueryItem(name: "max_distance_km", value: "\(maxDistanceKm)")) }
+        if let minBoy { items.append(URLQueryItem(name: "min_boy", value: "\(minBoy)")) }
+        if let maxBoy { items.append(URLQueryItem(name: "max_boy", value: "\(maxBoy)")) }
         return try await request("GET", path: "/api/v1/discover", queryItems: items)
     }
 

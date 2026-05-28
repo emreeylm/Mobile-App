@@ -38,6 +38,8 @@ struct UpdateUserRequest: Encodable {
     var now_watching: String?
     var konum: KoordinatRequest?
     var is_premium: Bool?
+    var boy: Int?          // cm cinsinden boy
+    var boy_gizli: Bool?   // true → profilinde gösterilmez
 }
 
 struct KoordinatRequest: Encodable {
@@ -72,6 +74,7 @@ struct DiscoverUser: Decodable {
     let uyumluluk_skoru: Int
     let foto_url: String?        // Profil fotoğrafı veya TMDB poster URL'si
     let ortak_medya: [String]    // Ortak medya başlıkları (en fazla 3)
+    let boy: Int?                // boy_gizli=true ise nil gelir
 }
 
 // MARK: - Swipe

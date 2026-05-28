@@ -15,6 +15,8 @@ class KullaniciGuncelle(BaseModel):
     hedef_cinsiyet: str | None = None
     now_watching: str | None = None
     konum: KoordinatSchema | None = None
+    boy: int | None = None          # cm cinsinden boy
+    boy_gizli: bool | None = None   # True → profilinde gösterilmez
 
 
 class KullaniciOlustur(BaseModel):
@@ -29,7 +31,7 @@ class KullaniciOlustur(BaseModel):
 
 class KullaniciResponse(BaseModel):
     id: uuid.UUID
-    email: str
+    email: str | None = None
     auth_provider: str
     isim: str
     yas: int
@@ -37,7 +39,9 @@ class KullaniciResponse(BaseModel):
     hedef_cinsiyet: str
     now_watching: str | None
     is_premium: bool
-    is_admin: bool = False   # Admin paneli için iOS tarafı bu alanı kullanır
+    is_admin: bool = False
+    boy: int | None = None
+    boy_gizli: bool = False
     kayit_tarihi: datetime
 
     model_config = {"from_attributes": True}

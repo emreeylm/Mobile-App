@@ -17,7 +17,8 @@ struct ProfileEditView: View {
     @State private var gender: Gender = .other
     @State private var lookingFor: LookingForGender = .everyone
     
-    @State private var height: String = ""
+    @State private var heightValue: Int = 170
+    @State private var showHeight: Bool = true
     @State private var smokingHabit: String = ""
     @State private var alcoholHabit: String = ""
     @State private var university: String = ""
@@ -101,10 +102,36 @@ struct ProfileEditView: View {
                                 textField("Şehir", text: $city)
                                 textField("Meslek", text: $jobTitle)
                                 
-                                HStack(spacing: 10) {
-                                    textField("Boy", text: $height)
-                                    textField("Sigara", text: $smokingHabit)
+                                // Boy seçici + görünürlük
+                                VStack(spacing: 10) {
+                                    HStack {
+                                        Text("Boy: \(heightValue) cm")
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(AppTheme.text)
+                                        Spacer()
+                                        Stepper("", value: $heightValue, in: 140...220)
+                                            .labelsHidden()
+                                    }
+                                    .padding()
+                                    .background(AppTheme.text.opacity(0.05))
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
+
+                                    HStack {
+                                        Text("Profilimde göster")
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(AppTheme.text)
+                                        Spacer()
+                                        Toggle("", isOn: $showHeight)
+                                            .labelsHidden()
+                                            .tint(AppTheme.accent)
+                                    }
+                                    .padding()
+                                    .background(AppTheme.text.opacity(0.05))
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
                                 }
+                                textField("Sigara", text: $smokingHabit)
                                 
                                 textField("Alkol Kullanımı", text: $alcoholHabit)
                                 textField("Üniversite", text: $university)
@@ -523,7 +550,10 @@ struct ProfileEditView: View {
         bio = profile.bio
         gender = profile.gender
         lookingFor = profile.lookingForGender
-        height = profile.height
+        // "170 cm" formatından sayıyı parse et
+        let parsed = profile.height.components(separatedBy: " ").first.flatMap { Int($0) } ?? 170
+        heightValue = max(140, min(220, parsed))
+        showHeight = profile.showHeight
         smokingHabit = profile.smokingHabit
         alcoholHabit = profile.alcoholHabit
         university = profile.university
@@ -565,7 +595,8 @@ struct ProfileEditView: View {
             profile.bio = bio
             profile.gender = gender
             profile.lookingForGender = lookingFor
-            profile.height = height
+            profile.height = "\(heightValue) cm"
+            profile.showHeight = showHeight
             profile.smokingHabit = smokingHabit
             profile.alcoholHabit = alcoholHabit
             profile.university = university
@@ -591,7 +622,9 @@ struct ProfileEditView: View {
                     yas: age,
                     cinsiyet: gender.rawValue,
                     hedef_cinsiyet: lookingFor.rawValue,
-                    now_watching: nowWatchingString.isEmpty ? nil : nowWatchingString
+                    now_watching: nowWatchingString.isEmpty ? nil : nowWatchingString,
+                    boy: heightValue,
+                    boy_gizli: !showHeight
                 )
                 _ = try? await APIClient.shared.updateMe(req)
                 // Yeni eklenen fotoğrafları backend'e yükle
@@ -616,7 +649,7 @@ struct ProfileEditView: View {
                 bio: bio,
                 gender: gender,
                 lookingForGender: lookingFor,
-                height: height,
+                height: "\(heightValue) cm",
                 smokingHabit: smokingHabit,
                 alcoholHabit: alcoholHabit,
                 university: university
