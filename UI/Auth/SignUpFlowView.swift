@@ -16,7 +16,7 @@ struct SignUpFlowView: View {
 
     // Step control — 1'den başlar (nameStep)
     @State private var step: Int
-    private let totalSteps = 17
+    private let totalSteps = 18
 
     // DATA
     @State private var firstName: String
@@ -93,20 +93,21 @@ struct SignUpFlowView: View {
                     case 1:  nameStep
                     case 2:  cityStep
                     case 3:  locationStep
-                    case 4:  photoStep
-                    case 5:  birthdayStep
-                    case 6:  genderStep
-                    case 7:  lookingForStep
-                    case 8:  movieStep
-                    case 9:  seriesStep
-                    case 10: genreStep
-                    case 11: interestStep
-                    case 12: heightStep
-                    case 13: aboutStep
-                    case 14: smokingStep
-                    case 15: alcoholStep
-                    case 16: universityStep
-                    case 17: nowWatchingStep
+                    case 4:  notificationStep
+                    case 5:  photoStep
+                    case 6:  birthdayStep
+                    case 7:  genderStep
+                    case 8:  lookingForStep
+                    case 9:  movieStep
+                    case 10: seriesStep
+                    case 11: genreStep
+                    case 12: interestStep
+                    case 13: heightStep
+                    case 14: aboutStep
+                    case 15: smokingStep
+                    case 16: alcoholStep
+                    case 17: universityStep
+                    case 18: nowWatchingStep
                     default: EmptyView()
                     }
                 }
@@ -155,7 +156,7 @@ struct SignUpFlowView: View {
                 Spacer()
                 
                 // Atla (Skip) Button for specific steps
-                if [12, 13, 14, 15, 16, 17].contains(step) {
+                if [13, 14, 15, 16, 17, 18].contains(step) {
                     Button("Atla") {
                         withAnimation {
                             if step == totalSteps { finishSignUp() }
@@ -246,7 +247,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if photos.count >= minPhotos { withAnimation { step = 5 } }
+            if photos.count >= minPhotos { withAnimation { step = 6 } }
             else { fail("Lütfen en az \(minPhotos) fotoğraf yükleyin.") }
         }
     }
@@ -262,7 +263,7 @@ struct SignUpFlowView: View {
                 .preferredColorScheme(.dark)
                 .colorMultiply(.white) // Ensure white text on dark bg
         } nextAction: {
-            withAnimation { step = 6 }
+            withAnimation { step = 7 }
         }
     }
 
@@ -279,7 +280,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 7 }
+            withAnimation { step = 8 }
         }
     }
 
@@ -294,7 +295,7 @@ struct SignUpFlowView: View {
                 selectionRow(title: "Erkekler", isSelected: lookingFor == .male) { lookingFor = .male }
             }
         } nextAction: {
-            withAnimation { step = 8 }
+            withAnimation { step = 9 }
         }
     }
 
@@ -341,7 +342,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedMovieIds.count >= minSelection { withAnimation { step = 9 } }
+            if selectedMovieIds.count >= minSelection { withAnimation { step = 10 } }
             else { fail("Lütfen en az \(minSelection) film seçin.") }
         }
         .onAppear {
@@ -397,7 +398,7 @@ struct SignUpFlowView: View {
                 if total > 20 {
                     fail("Seçilen film ve dizi toplamı en fazla 20 olabilir. Şu an: \(total)")
                 } else {
-                    withAnimation { step = 10 }
+                    withAnimation { step = 11 }
                 }
             } else {
                 fail("Lütfen en az \(minSelection) dizi seçin.")
@@ -431,7 +432,7 @@ struct SignUpFlowView: View {
                 )
             }
         } nextAction: {
-            if selectedGenres.count >= minGenres { withAnimation { step = 11 } }
+            if selectedGenres.count >= minGenres { withAnimation { step = 12 } }
             else { fail("Lütfen en az \(minGenres) tür seçin.") }
         }
     }
@@ -513,7 +514,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedInterests.count >= minInterests { withAnimation { step = 12 } }
+            if selectedInterests.count >= minInterests { withAnimation { step = 13 } }
             else { fail("Lütfen en az \(minInterests) ilgi alanı seçin. (maks \(maxInterests))") }
         }
     }
@@ -550,7 +551,7 @@ struct SignUpFlowView: View {
                 .clipShape(Capsule())
             }
         } nextAction: {
-            withAnimation { step = 13 }
+            withAnimation { step = 14 }
         }
     }
 
@@ -571,7 +572,7 @@ struct SignUpFlowView: View {
                 )
                 .foregroundColor(AppTheme.text)
         } nextAction: {
-            withAnimation { step = 14 }
+            withAnimation { step = 15 }
         }
     }
 
@@ -589,7 +590,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 15 }
+            withAnimation { step = 16 }
         }
     }
 
@@ -607,7 +608,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 16 }
+            withAnimation { step = 17 }
         }
     }
 
@@ -670,6 +671,54 @@ struct SignUpFlowView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
+    // MARK: - Notification Step
+
+    private var notificationStep: some View {
+        stepContainer(
+            title: "🔔 Bildirimler",
+            subtitle: "Eşleşme ve mesaj bildirimlerini kaçırma."
+        ) {
+            VStack(spacing: 24) {
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 72))
+                    .foregroundStyle(AppTheme.accent)
+                    .padding(.top, 16)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    notifFeatureRow(icon: "heart.fill",
+                                    text: "Biriyle eşleşince anında haber al")
+                    notifFeatureRow(icon: "message.fill",
+                                    text: "Yeni mesajları hiç kaçırma")
+                    notifFeatureRow(icon: "bell.slash.fill",
+                                    text: "İstediğin zaman ayarlardan kapatabilirsin")
+                }
+                .padding(.horizontal, 8)
+            }
+            .frame(maxWidth: .infinity)
+        } nextAction: {
+            Task { await PushNotificationManager.shared.requestPermission() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation { step = 5 }
+            }
+        }
+    }
+
+    private func notifFeatureRow(icon: String, text: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(AppTheme.accent)
+                .frame(width: 28)
+            Text(text)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(AppTheme.text.opacity(0.8))
+            Spacer()
+        }
+        .padding(14)
+        .background(AppTheme.text.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
     private var universityStep: some View {
         stepContainer(
             title: "Üniversite bilgin nedir?",
@@ -678,7 +727,7 @@ struct SignUpFlowView: View {
             TextField("Üniversite adı", text: $university)
                 .setupTextFieldStyle()
         } nextAction: {
-            withAnimation { step = 17 }
+            withAnimation { step = 18 }
         }
     }
 
