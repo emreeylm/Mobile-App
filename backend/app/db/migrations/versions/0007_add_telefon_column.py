@@ -15,18 +15,37 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # telefon kolonu ekle (E.164 formatında, ör: +905xxxxxxxxx)
-    op.add_column(
-        "tbl_kullanicilar",
-        sa.Column("telefon", sa.String(20), nullable=True),
-    )
-    op.create_unique_constraint("uq_kullanicilar_telefon", "tbl_kullanicilar", ["telefon"])
+    # telefon kolonu ekle (IF NOT EXISTS — idempotent)
+    op.execute("""
+        ALTER TABLE tbl_kullanicilar
+        ADD COLUMN IF NOT EXISTS telefon VARCHAR(20)
+    """)
 
-    # email'i nullable yap (telefon auth kullananların email'i olmaz)
-    op.alter_column("tbl_kullanicilar", "email", nullable=True)
+    # unique constraint ekle (yoksa)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE constraint_name = 'uq_kullanicilar_telefon'
+                  AND table_name = 'tbl_kullanicilar'
+            ) THEN
+                ALTER TABLE tbl_kullanicilar
+                ADD CONSTRAINT uq_kullanicilar_telefon UNIQUE (telefon);
+            END IF;
+        END $$
+    """)
+
+    # email nullable yap (DROP NOT NULL — zaten nullable ise no-op)
+    op.execute("""
+        ALTER TABLE tbl_kullanicilar
+        ALTER COLUMN email DROP NOT NULL
+    """)
 
 
 def downgrade() -> None:
-    op.alter_column("tbl_kullanicilar", "email", nullable=False)
-    op.drop_constraint("uq_kullanicilar_telefon", "tbl_kullanicilar", type_="unique")
+    op.execute("ALTER TABLE tbl_kullanicilar ALTER COLUMN email SET NOT NULL")
+    op.execute("""
+        ALTER TABLE tbl_kullanicilar
+        DROP CONSTRAINT IF EXISTS uq_kullanicilar_telefon
+    """)
     op.drop_column("tbl_kullanicilar", "telefon")

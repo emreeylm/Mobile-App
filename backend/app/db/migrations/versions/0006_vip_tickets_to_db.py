@@ -18,10 +18,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "tbl_kullanicilar",
-        sa.Column("vip_bilet_bakiye", sa.Integer(), nullable=False, server_default="0"),
-    )
+    # IF NOT EXISTS: kolon zaten varsa sessizce geç (idempotent)
+    op.execute("""
+        ALTER TABLE tbl_kullanicilar
+        ADD COLUMN IF NOT EXISTS vip_bilet_bakiye INTEGER NOT NULL DEFAULT 0
+    """)
 
 
 def downgrade() -> None:
