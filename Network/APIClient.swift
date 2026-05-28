@@ -199,18 +199,6 @@ extension APIClient {
                           requiresAuth: false)
     }
 
-    func requestPhoneOTP(telefon: String) async throws -> PhoneOTPResponse {
-        try await request("POST", path: "/api/v1/auth/phone/request-otp",
-                          body: PhoneOTPRequest(telefon: telefon),
-                          requiresAuth: false)
-    }
-
-    func verifyPhoneOTP(telefon: String, otpCode: String) async throws -> TokenResponse {
-        try await request("POST", path: "/api/v1/auth/phone/verify-otp",
-                          body: PhoneVerifyRequest(telefon: telefon, otp_code: otpCode),
-                          requiresAuth: false)
-    }
-
     // User
     func getMe() async throws -> UserResponse {
         try await request("GET", path: "/api/v1/users/me")

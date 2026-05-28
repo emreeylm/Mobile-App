@@ -16,21 +16,6 @@ struct TokenResponse: Decodable {
     let is_new_user: Bool
 }
 
-// MARK: - Telefon OTP Auth
-struct PhoneOTPRequest: Encodable {
-    let telefon: String   // E.164: +905xxxxxxxxx
-}
-
-struct PhoneOTPResponse: Decodable {
-    let sent: Bool
-    let otp_code: String?   // demo modda dolu, production'da nil
-}
-
-struct PhoneVerifyRequest: Encodable {
-    let telefon: String
-    let otp_code: String
-}
-
 // MARK: - User
 struct UserResponse: Decodable {
     let id: String

@@ -59,38 +59,6 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    // MARK: - Telefon OTP Auth
-
-    /// OTP doğrulama. Başarılıysa true (yeni kullanıcı) veya false (mevcut kullanıcı) döner.
-    /// Çağıran: AuthLandingView
-    @discardableResult
-    func verifyPhoneOTP(telefon: String, code: String, modelContext: ModelContext) async -> Bool {
-        authErrorMessage = nil
-        do {
-            let resp = try await api.verifyPhoneOTP(telefon: telefon, otpCode: code)
-            keychain.save(resp.access_token, for: KeychainManager.accessTokenKey)
-            keychain.save(resp.refresh_token, for: KeychainManager.refreshTokenKey)
-            let user = try await api.getMe()
-            keychain.save(user.id, for: KeychainManager.userIdKey)
-            isAuthed = true
-            currentUserId = user.id
-            backendUser = user
-            authErrorMessage = nil
-            loadMyProfile(modelContext: modelContext)
-            return resp.is_new_user
-        } catch let error as APIError {
-            if case .httpError(400, _) = error {
-                authErrorMessage = "Geçersiz veya süresi dolmuş kod."
-            } else {
-                authErrorMessage = "Doğrulama başarısız. Tekrar dene."
-            }
-            return false
-        } catch {
-            authErrorMessage = "Bağlantı hatası."
-            return false
-        }
-    }
-
     // MARK: - Social Auth (Apple / Google)
 
     /// Apple veya Google id_token ile backend'e giriş yapar.
