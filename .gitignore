@@ -38,3 +38,6 @@ backend/**/__pycache__/
 backend/*.pyc
 backend/uvicorn.log
 backend/.pytest_cache/
+
+# Secret keys
+Secrets.xcconfig

@@ -42,11 +42,11 @@ class TMDBService {
     /// Xcode scheme / .xcconfig → `TMDB_API_KEY=<key>` ile tanımlanmalı,
     /// Info.plist'e `<key>TMDB_API_KEY</key><string>$(TMDB_API_KEY)</string>` eklenmelidir.
     private let apiKey: String = {
-        if let key = Bundle.main.infoDictionary?["TMDB_API_KEY"] as? String, !key.isEmpty {
-            return key
+        guard let key = Bundle.main.infoDictionary?["TMDB_API_KEY"] as? String, !key.isEmpty else {
+            assertionFailure("TMDB_API_KEY bulunamadı. Secrets.xcconfig dosyasını projeye ekleyin.")
+            return ""
         }
-        // Fallback: hardcode (geliştirme ortamı için; üretimde Info.plist kullanın)
-        return "b4ff215cd5e7eb31939788e97cac1488"
+        return key
     }()
 
     private let baseURL = "https://api.themoviedb.org/3"
