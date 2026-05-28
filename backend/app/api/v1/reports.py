@@ -47,7 +47,7 @@ async def report_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Kendinizi raporlayamazsınız")
     if body.sebep not in VALID_REASONS:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Geçersiz sebep. Seçenekler: {', '.join(VALID_REASONS)}",
         )
     await report_service.report_user(db, user_id, body.hedef_id, body.sebep, body.aciklama)
