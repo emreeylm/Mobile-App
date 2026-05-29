@@ -43,6 +43,9 @@ struct SignUpFlowView: View {
     @State private var selectedGenres: Set<String> = []
     @State private var selectedMovieIds: Set<String> = []
     @State private var selectedSeriesIds: Set<String> = []
+    // Seçilen item'ların tam nesnesi — arama değişince kaybolmasın diye
+    @State private var selectedMovieItems: [String: TMDBSearchResult] = [:]
+    @State private var selectedSeriesItems: [String: TMDBSearchResult] = [:]
     
     @State private var movieSearchQuery: String = ""
     @State private var seriesSearchQuery: String = ""
@@ -1166,11 +1169,10 @@ struct SignUpFlowView: View {
                 ))
 
                 // 3. Seçilen medyayı backend'e gönder
-                let seriesItems = seriesSearchResults
-                    .filter { selectedSeriesIds.contains("\($0.id)") }
+                // selectedSeriesItems/selectedMovieItems — aramalar değişse de seçimler kaybolmaz
+                let seriesItems = Array(selectedSeriesItems.values)
                     .map { OnboardingMediaItem(id: $0.id, baslik: $0.displayName, tip: "tv", afis_url: $0.posterURL) }
-                let movieItems = movieSearchResults
-                    .filter { selectedMovieIds.contains("\($0.id)") }
+                let movieItems = Array(selectedMovieItems.values)
                     .map { OnboardingMediaItem(id: $0.id, baslik: $0.displayName, tip: "movie", afis_url: $0.posterURL) }
 
                 try await APIClient.shared.saveOnboarding(OnboardingRequest(
@@ -1219,7 +1221,7 @@ struct SignUpFlowView: View {
                     }
                 }
 
-                for result in movieSearchResults where selectedMovieIds.contains("\(result.id)") {
+                for result in selectedMovieItems.values {
                     let item = MediaItem(
                         title: result.displayName,
                         type: .movie,
@@ -1230,7 +1232,7 @@ struct SignUpFlowView: View {
                     modelContext.insert(item)
                     modelContext.insert(ProfileMedia(profileId: profile.id, mediaId: item.id))
                 }
-                for result in seriesSearchResults where selectedSeriesIds.contains("\(result.id)") {
+                for result in selectedSeriesItems.values {
                     let item = MediaItem(
                         title: result.displayName,
                         type: .series,
@@ -1322,16 +1324,18 @@ struct SignUpFlowView: View {
         if type == .movie {
             if selectedMovieIds.contains(idString) {
                 selectedMovieIds.remove(idString)
+                selectedMovieItems.removeValue(forKey: idString)
             } else {
                 selectedMovieIds.insert(idString)
-                // Ensure MediaItem exists in SwiftData for this ID? 
-                // We'll insert it during finishSignUp to avoid redundant objects
+                selectedMovieItems[idString] = result
             }
         } else {
             if selectedSeriesIds.contains(idString) {
                 selectedSeriesIds.remove(idString)
+                selectedSeriesItems.removeValue(forKey: idString)
             } else {
                 selectedSeriesIds.insert(idString)
+                selectedSeriesItems[idString] = result
             }
         }
     }
