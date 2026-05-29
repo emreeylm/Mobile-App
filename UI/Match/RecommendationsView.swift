@@ -18,6 +18,8 @@ struct RecommendationsView: View {
     @AppStorage("pref.minAge") private var prefMinAge: Int = 18
     @AppStorage("pref.maxAge") private var prefMaxAge: Int = 35
     @AppStorage("pref.distanceKm") private var prefDistanceKm: Int = 25
+    @AppStorage("pref.minBoy") private var prefMinBoy: Int = 140
+    @AppStorage("pref.maxBoy") private var prefMaxBoy: Int = 220
 
     @EnvironmentObject var session: SessionStore
     @EnvironmentObject var subscriptionStore: AppSubscriptionStore
@@ -190,6 +192,8 @@ struct RecommendationsView: View {
         .onChange(of: prefGender) { _, _ in buildDeck(force: true) }
         .onChange(of: prefMinAge) { _, _ in buildDeck(force: true) }
         .onChange(of: prefMaxAge) { _, _ in buildDeck(force: true) }
+        .onChange(of: prefMinBoy) { _, _ in buildDeck(force: true) }
+        .onChange(of: prefMaxBoy) { _, _ in buildDeck(force: true) }
     }
 
     private var emptyState: some View {
@@ -254,13 +258,19 @@ struct RecommendationsView: View {
             others = others.filter { p in
                 // Age filter
                 guard p.age >= prefMinAge && p.age <= prefMaxAge else { return false }
-                
+
                 // Gender filter
                 if prefGender != "Herkes" && p.gender.rawValue != prefGender { return false }
-                
+
+                // Height filter (only when a real range is set, not the full 140-220 default)
+                if prefMinBoy > 140 || prefMaxBoy < 220 {
+                    let heightInt = Int(p.height.components(separatedBy: " ").first ?? "") ?? 0
+                    if heightInt > 0 && (heightInt < prefMinBoy || heightInt > prefMaxBoy) { return false }
+                }
+
                 // Note: Distance is not actively calculated since distance math requires coordinate data,
                 // but if we had it, we would calculate LocationManager.distance(p.location) <= prefDistanceKm
-                
+
                 return true
             }
         }
@@ -431,12 +441,16 @@ struct RecommendationsView: View {
         let lon = loc?.coordinate.longitude ?? 0.0
         let isPremium = subscriptionStore.isPremium
         do {
+            let minBoyFilter = (prefMinBoy > 140 || prefMaxBoy < 220) ? prefMinBoy : nil
+            let maxBoyFilter = (prefMinBoy > 140 || prefMaxBoy < 220) ? prefMaxBoy : nil
             let resp = try await APIClient.shared.getDiscover(
                 lat: lat,
                 lon: lon,
                 minAge: isPremium ? prefMinAge : nil,
                 maxAge: isPremium ? prefMaxAge : nil,
-                maxDistanceKm: isPremium ? prefDistanceKm : nil
+                maxDistanceKm: isPremium ? prefDistanceKm : nil,
+                minBoy: isPremium ? minBoyFilter : nil,
+                maxBoy: isPremium ? maxBoyFilter : nil
             )
             for user in resp.kullanicilar {
                 guard profiles.first(where: { $0.ownerUserId == user.id }) == nil else { continue }

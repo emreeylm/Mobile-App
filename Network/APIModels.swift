@@ -19,7 +19,7 @@ struct TokenResponse: Decodable {
 // MARK: - User
 struct UserResponse: Decodable {
     let id: String
-    let email: String
+    let email: String?        // nullable: Apple may not share email
     let isim: String
     let yas: Int
     let cinsiyet: String
@@ -28,6 +28,8 @@ struct UserResponse: Decodable {
     let is_premium: Bool
     let is_admin: Bool        // Admin paneli erişimi için
     let auth_provider: String? // "email" | "apple" | "google"
+    let boy: Int?             // cm cinsinden boy (kullanıcı gizlediyse nil)
+    let boy_gizli: Bool       // true → profilinde boy gösterilmez
 }
 
 struct UpdateUserRequest: Encodable {

@@ -6,6 +6,8 @@ struct PreferencesView: View {
     @AppStorage("pref.minAge") private var minAge: Int = 18
     @AppStorage("pref.maxAge") private var maxAge: Int = 35
     @AppStorage("pref.distanceKm") private var distanceKm: Int = 25
+    @AppStorage("pref.minBoy") private var minBoy: Int = 140
+    @AppStorage("pref.maxBoy") private var maxBoy: Int = 220
 
     @Environment(\.dismiss) private var dismiss
 
@@ -100,6 +102,46 @@ struct PreferencesView: View {
                                 step: 1
                             )
                             .tint(AppTheme.accent)
+                        }
+                    }
+
+                    // Boy Aralığı
+                    preferenceCard(title: "Boy Aralığı", icon: "ruler.fill") {
+                        VStack(spacing: 20) {
+                            HStack {
+                                Text("\(minBoy) - \(maxBoy)")
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .foregroundColor(AppTheme.accent)
+                                Spacer()
+                                Text("cm")
+                                    .font(.headline)
+                                    .foregroundColor(AppTheme.accent.opacity(0.7))
+                            }
+
+                            VStack(spacing: 12) {
+                                customSlider(
+                                    title: "Minimum",
+                                    value: Binding(get: { Double(minBoy) }, set: { minBoy = Int($0) }),
+                                    range: 140...220
+                                )
+                                customSlider(
+                                    title: "Maksimum",
+                                    value: Binding(get: { Double(maxBoy) }, set: { maxBoy = Int($0) }),
+                                    range: 140...220
+                                )
+                            }
+                            .onChange(of: maxBoy) { _, newValue in
+                                if newValue < minBoy { minBoy = newValue }
+                            }
+                            .onChange(of: minBoy) { _, newValue in
+                                if newValue > maxBoy { maxBoy = newValue }
+                            }
+
+                            if minBoy == 140 && maxBoy == 220 {
+                                Text("Tüm boylar gösteriliyor")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.text.opacity(0.4))
+                            }
                         }
                     }
 
