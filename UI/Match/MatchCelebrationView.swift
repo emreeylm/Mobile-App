@@ -179,7 +179,15 @@ struct MatchCelebrationView: View {
                 .frame(width: 110, height: 110)
                 .shadow(color: (isMe ? AppTheme.accent : Color.pink).opacity(0.35), radius: 14)
 
-            if let urlStr = profile?.remotePhotoURL, let url = URL(string: urlStr) {
+            if let photoData = profile?.photos.sorted(by: { $0.order < $1.order }).first?.data,
+               let uiImage = UIImage(data: photoData) {
+                // Yerel fotoğraf var → öncelikli kullan
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 106, height: 106)
+                    .clipShape(Circle())
+            } else if let urlStr = profile?.remotePhotoURL, let url = URL(string: urlStr) {
                 AsyncImage(url: url) { img in
                     img.resizable().scaledToFill()
                 } placeholder: {

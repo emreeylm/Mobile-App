@@ -55,6 +55,9 @@ struct LikesView: View {
                         .padding(.top, 20)
                         .padding(.horizontal, 16)
                     }
+                    .refreshable {
+                        await refreshLikes()
+                    }
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -72,6 +75,7 @@ struct LikesView: View {
                 }
             }
             .task { await refreshLikes() }
+            .onAppear { Task { await refreshLikes() } }
             .alert("Bağlantı Hatası", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }

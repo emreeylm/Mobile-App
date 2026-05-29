@@ -587,7 +587,7 @@ struct SignUpFlowView: View {
                     Spacer()
                     Toggle("", isOn: $showHeight)
                         .labelsHidden()
-                        .tint(AppTheme.accent)
+                        .tint(.green)
                 }
                 .padding(14)
                 .background(AppTheme.text.opacity(0.04))
