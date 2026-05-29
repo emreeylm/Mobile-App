@@ -29,7 +29,7 @@ struct UserResponse: Decodable {
     let is_admin: Bool        // Admin paneli erişimi için
     let auth_provider: String? // "email" | "apple" | "google"
     let boy: Int?             // cm cinsinden boy (kullanıcı gizlediyse nil)
-    let boy_gizli: Bool       // true → profilinde boy gösterilmez
+    let boy_gizli: Bool?      // true → profilinde boy gösterilmez; eski backend'de nil gelebilir
 }
 
 struct UpdateUserRequest: Encodable {
