@@ -212,7 +212,6 @@ struct ProfilePreviewView: View {
     private func infoGrid(profile: Profile) -> some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
             infoCard(icon: "ruler", value: profile.height, label: "BOY")
-            infoCard(icon: "graduationcap", value: profile.university.isEmpty ? "Belirtilmedi" : profile.university, label: "EĞİTİM")
             infoCard(icon: "briefcase", value: profile.jobTitle.isEmpty ? "Belirtilmedi" : profile.jobTitle, label: "MESLEK")
             infoCard(icon: "nosign", value: profile.smokingHabit, label: "SİGARA")
         }

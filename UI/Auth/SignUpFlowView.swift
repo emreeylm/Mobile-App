@@ -16,7 +16,7 @@ struct SignUpFlowView: View {
 
     // Step control — 1'den başlar (nameStep)
     @State private var step: Int
-    private let totalSteps = 16
+    private let totalSteps = 15
 
     // Konum izni yönetimi
     @ObservedObject private var locationManager = LocationManager.shared
@@ -62,8 +62,6 @@ struct SignUpFlowView: View {
     @State private var aboutMe: String = ""
     @State private var smokingHabit: String = "Söylemek istemiyorum"
     @State private var alcoholHabit: String = "Söylemek istemiyorum"
-    @State private var university: String = ""
-
     // NOW WATCHING
     @State private var nowWatchingQuery: String = ""
     @State private var nowWatchingResults: [TMDBSearchResult] = []
@@ -109,8 +107,7 @@ struct SignUpFlowView: View {
                     case 12: aboutStep
                     case 13: smokingStep
                     case 14: alcoholStep
-                    case 15: universityStep
-                    case 16: nowWatchingStep
+                    case 15: nowWatchingStep
                     default: EmptyView()
                     }
                 }
@@ -179,7 +176,7 @@ struct SignUpFlowView: View {
                 Spacer()
                 
                 // Atla (Skip) Button for specific steps
-                if [11, 12, 13, 14, 15, 16].contains(step) {
+                if [11, 12, 13, 14, 15].contains(step) {
                     Button("Atla") {
                         withAnimation {
                             if step == totalSteps { finishSignUp() }
@@ -728,18 +725,6 @@ struct SignUpFlowView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
-    private var universityStep: some View {
-        stepContainer(
-            title: "Üniversite bilgin nedir?",
-            subtitle: "Eğitim bilgilerini eklemek istersen gir."
-        ) {
-            TextField("Üniversite adı", text: $university)
-                .setupTextFieldStyle()
-        } nextAction: {
-            withAnimation { step = 16 }
-        }
-    }
-
     // MARK: - Now Watching Step
 
     private var nowWatchingStep: some View {
@@ -1214,7 +1199,6 @@ struct SignUpFlowView: View {
                     height: "\(heightValue) \(heightUnit)",
                     smokingHabit: smokingHabit,
                     alcoholHabit: alcoholHabit,
-                    university: university,
                     interests: Array(selectedInterests),
                     nowWatching: nowWatchingString
                 )

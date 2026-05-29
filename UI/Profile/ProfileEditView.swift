@@ -21,7 +21,6 @@ struct ProfileEditView: View {
     @State private var showHeight: Bool = true
     @State private var smokingHabit: String = ""
     @State private var alcoholHabit: String = ""
-    @State private var university: String = ""
 
     // Now Watching
     @State private var selectedShowName: String = ""
@@ -134,7 +133,6 @@ struct ProfileEditView: View {
                                 textField("Sigara", text: $smokingHabit)
                                 
                                 textField("Alkol Kullanımı", text: $alcoholHabit)
-                                textField("Üniversite", text: $university)
                                 nowWatchingSection
 
                                 HStack {
@@ -556,7 +554,6 @@ struct ProfileEditView: View {
         showHeight = profile.showHeight
         smokingHabit = profile.smokingHabit
         alcoholHabit = profile.alcoholHabit
-        university = profile.university
         // "Breaking Bad - 1. Sezon 4. Bölüm" formatını parse et
         let nw = profile.nowWatching
         if !nw.isEmpty {
@@ -599,7 +596,6 @@ struct ProfileEditView: View {
             profile.showHeight = showHeight
             profile.smokingHabit = smokingHabit
             profile.alcoholHabit = alcoholHabit
-            profile.university = university
             profile.nowWatching = nowWatchingString
 
             // ✅ photos relation yeniden yaz
@@ -651,8 +647,7 @@ struct ProfileEditView: View {
                 lookingForGender: lookingFor,
                 height: "\(heightValue) cm",
                 smokingHabit: smokingHabit,
-                alcoholHabit: alcoholHabit,
-                university: university
+                alcoholHabit: alcoholHabit
             )
 
             for (idx, d) in photos.enumerated() {
