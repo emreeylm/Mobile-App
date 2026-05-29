@@ -16,7 +16,11 @@ struct SignUpFlowView: View {
 
     // Step control — 1'den başlar (nameStep)
     @State private var step: Int
-    private let totalSteps = 17
+    private let totalSteps = 16
+
+    // Konum izni yönetimi
+    @ObservedObject private var locationManager = LocationManager.shared
+    @State private var showLocationDeniedAlert = false
 
     // DATA
     @State private var firstName: String
@@ -93,21 +97,20 @@ struct SignUpFlowView: View {
                     switch step {
                     case 1:  nameStep
                     case 2:  locationStep
-                    case 3:  notificationStep
-                    case 4:  photoStep
-                    case 5:  birthdayStep
-                    case 6:  genderStep
-                    case 7:  lookingForStep
-                    case 8:  movieStep
-                    case 9:  seriesStep
-                    case 10: genreStep
-                    case 11: interestStep
-                    case 12: heightStep
-                    case 13: aboutStep
-                    case 14: smokingStep
-                    case 15: alcoholStep
-                    case 16: universityStep
-                    case 17: nowWatchingStep
+                    case 3:  photoStep
+                    case 4:  birthdayStep
+                    case 5:  genderStep
+                    case 6:  lookingForStep
+                    case 7:  movieStep
+                    case 8:  seriesStep
+                    case 9:  genreStep
+                    case 10: interestStep
+                    case 11: heightStep
+                    case 12: aboutStep
+                    case 13: smokingStep
+                    case 14: alcoholStep
+                    case 15: universityStep
+                    case 16: nowWatchingStep
                     default: EmptyView()
                     }
                 }
@@ -120,6 +123,26 @@ struct SignUpFlowView: View {
             Button("Tamam", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+        .alert("Konum İzni Gerekli", isPresented: $showLocationDeniedAlert) {
+            Button("Ayarları Aç") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Tamam", role: .cancel) { }
+        } message: {
+            Text("Yakınındaki kişilerle eşleşmek için konum izni zorunludur. Ayarlar'dan izin verebilirsin.")
+        }
+        .onChange(of: locationManager.authStatus) { _, status in
+            guard step == 2 else { return }
+            switch status {
+            case .authorizedWhenInUse, .authorizedAlways:
+                withAnimation { step = 3 }
+            case .denied, .restricted:
+                showLocationDeniedAlert = true
+            default: break
+            }
         }
         .onAppear {
             seedMediaIfNeeded()
@@ -156,7 +179,7 @@ struct SignUpFlowView: View {
                 Spacer()
                 
                 // Atla (Skip) Button for specific steps
-                if [12, 13, 14, 15, 16, 17].contains(step) {
+                if [11, 12, 13, 14, 15, 16].contains(step) {
                     Button("Atla") {
                         withAnimation {
                             if step == totalSteps { finishSignUp() }
@@ -247,7 +270,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if photos.count >= minPhotos { withAnimation { step = 5 } }
+            if photos.count >= minPhotos { withAnimation { step = 4 } }
             else { fail("Lütfen en az \(minPhotos) fotoğraf yükleyin.") }
         }
     }
@@ -263,7 +286,7 @@ struct SignUpFlowView: View {
                 .preferredColorScheme(.dark)
                 .colorMultiply(.white) // Ensure white text on dark bg
         } nextAction: {
-            withAnimation { step = 6 }
+            withAnimation { step = 5 }
         }
     }
 
@@ -280,7 +303,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 7 }
+            withAnimation { step = 6 }
         }
     }
 
@@ -295,7 +318,7 @@ struct SignUpFlowView: View {
                 selectionRow(title: "Erkekler", isSelected: lookingFor == .male) { lookingFor = .male }
             }
         } nextAction: {
-            withAnimation { step = 8 }
+            withAnimation { step = 7 }
         }
     }
 
@@ -342,7 +365,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedMovieIds.count >= minSelection { withAnimation { step = 9 } }
+            if selectedMovieIds.count >= minSelection { withAnimation { step = 8 } }
             else { fail("Lütfen en az \(minSelection) film seçin.") }
         }
         .onAppear {
@@ -398,7 +421,7 @@ struct SignUpFlowView: View {
                 if total > 20 {
                     fail("Seçilen film ve dizi toplamı en fazla 20 olabilir. Şu an: \(total)")
                 } else {
-                    withAnimation { step = 10 }
+                    withAnimation { step = 9 }
                 }
             } else {
                 fail("Lütfen en az \(minSelection) dizi seçin.")
@@ -432,7 +455,7 @@ struct SignUpFlowView: View {
                 )
             }
         } nextAction: {
-            if selectedGenres.count >= minGenres { withAnimation { step = 11 } }
+            if selectedGenres.count >= minGenres { withAnimation { step = 10 } }
             else { fail("Lütfen en az \(minGenres) tür seçin.") }
         }
     }
@@ -514,7 +537,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            if selectedInterests.count >= minInterests { withAnimation { step = 12 } }
+            if selectedInterests.count >= minInterests { withAnimation { step = 11 } }
             else { fail("Lütfen en az \(minInterests) ilgi alanı seçin. (maks \(maxInterests))") }
         }
     }
@@ -578,7 +601,7 @@ struct SignUpFlowView: View {
                     boy_gizli: !showHeight
                 ))
             }
-            withAnimation { step = 13 }
+            withAnimation { step = 12 }
         }
     }
 
@@ -599,7 +622,7 @@ struct SignUpFlowView: View {
                 )
                 .foregroundColor(AppTheme.text)
         } nextAction: {
-            withAnimation { step = 14 }
+            withAnimation { step = 13 }
         }
     }
 
@@ -617,7 +640,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 15 }
+            withAnimation { step = 14 }
         }
     }
 
@@ -635,7 +658,7 @@ struct SignUpFlowView: View {
                 }
             }
         } nextAction: {
-            withAnimation { step = 16 }
+            withAnimation { step = 15 }
         }
     }
 
@@ -674,63 +697,22 @@ struct SignUpFlowView: View {
             }
             .frame(maxWidth: .infinity)
         } nextAction: {
-            LocationManager.shared.requestPermission()
-            // Sistem diyaloğunun kapanmasına zaman tanı, sonra bir sonraki adıma geç
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            let status = locationManager.authStatus
+            switch status {
+            case .authorizedWhenInUse, .authorizedAlways:
+                // Zaten izin verilmiş, direkt ilerle
                 withAnimation { step = 3 }
+            case .denied, .restricted:
+                // Reddedilmiş, ayarları aç
+                showLocationDeniedAlert = true
+            default:
+                // notDetermined: sistem diyaloğunu göster; onChange ile ilerlenecek
+                LocationManager.shared.requestPermission()
             }
         }
     }
 
     private func locationFeatureRow(icon: String, text: String) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(AppTheme.accent)
-                .frame(width: 28)
-            Text(text)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(AppTheme.text.opacity(0.8))
-            Spacer()
-        }
-        .padding(14)
-        .background(AppTheme.text.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    // MARK: - Notification Step
-
-    private var notificationStep: some View {
-        stepContainer(
-            title: "🔔 Bildirimler",
-            subtitle: "Eşleşme ve mesaj bildirimlerini kaçırma."
-        ) {
-            VStack(spacing: 24) {
-                Image(systemName: "bell.badge.fill")
-                    .font(.system(size: 72))
-                    .foregroundStyle(AppTheme.accent)
-                    .padding(.top, 16)
-
-                VStack(alignment: .leading, spacing: 14) {
-                    notifFeatureRow(icon: "heart.fill",
-                                    text: "Biriyle eşleşince anında haber al")
-                    notifFeatureRow(icon: "message.fill",
-                                    text: "Yeni mesajları hiç kaçırma")
-                    notifFeatureRow(icon: "bell.slash.fill",
-                                    text: "İstediğin zaman ayarlardan kapatabilirsin")
-                }
-                .padding(.horizontal, 8)
-            }
-            .frame(maxWidth: .infinity)
-        } nextAction: {
-            Task { await PushNotificationManager.shared.requestPermission() }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation { step = 4 }
-            }
-        }
-    }
-
-    private func notifFeatureRow(icon: String, text: String) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 16))
@@ -754,7 +736,7 @@ struct SignUpFlowView: View {
             TextField("Üniversite adı", text: $university)
                 .setupTextFieldStyle()
         } nextAction: {
-            withAnimation { step = 17 }
+            withAnimation { step = 16 }
         }
     }
 
@@ -1179,6 +1161,8 @@ struct SignUpFlowView: View {
     private func finishSignUp() {
         guard !isSubmitting else { return }
         isSubmitting = true
+        // Kayıt tamamlandıktan hemen sonra bildirim iznini iste
+        Task { await PushNotificationManager.shared.requestPermission() }
 
         Task { @MainActor in
             defer { isSubmitting = false }

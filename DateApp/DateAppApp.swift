@@ -18,8 +18,6 @@ struct DateAppApp: App {
                 .environmentObject(subscriptionStore)
                 .onAppear {
                     DemoSeeder.seedIfNeeded(context: container.mainContext)
-                    LocationManager.shared.requestPermission()
-                    Task { await PushNotificationManager.shared.requestPermission() }
                 }
                 .preferredColorScheme(.dark)
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
