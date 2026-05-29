@@ -19,6 +19,11 @@ struct ProfilePreviewView: View {
     @State private var vipError = false
     @State private var showPaywall = false
 
+    // Fotoğraf galerisi
+    @State private var currentPhotoIndex = 0
+    @State private var showPhotoGallery = false
+    @State private var galleryStartIndex = 0
+
     private var displayProfile: Profile? {
         profile ?? session.currentProfile
     }
@@ -74,6 +79,14 @@ struct ProfilePreviewView: View {
             }
         }
         .navigationBarHidden(true)
+        .fullScreenCover(isPresented: $showPhotoGallery) {
+            if let p = displayProfile {
+                PhotoGalleryView(
+                    photos: p.photos.sorted(by: { $0.order < $1.order }),
+                    startIndex: galleryStartIndex
+                )
+            }
+        }
         .sheet(isPresented: $showVipSheet) {
             if let p = displayProfile {
                 VIPSendSheet(targetId: p.ownerUserId, message: $vipMessage,
@@ -144,22 +157,14 @@ struct ProfilePreviewView: View {
     }
 
     private func mainImageView(profile: Profile) -> some View {
-        GeometryReader { geo in
+        let sortedPhotos = profile.photos.sorted(by: { $0.order < $1.order })
+
+        return GeometryReader { geo in
             let imageSize = geo.size.width
-            ZStack(alignment: .bottomTrailing) {
-                if let photoData = profile.photos.sorted(by: { $0.order < $1.order }).first?.data,
-                   let uiImage = UIImage(data: photoData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: imageSize, height: imageSize)
-                        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 32)
-                                .stroke(AppTheme.text.opacity(0.1), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
-                } else {
+
+            ZStack(alignment: .bottom) {
+                if sortedPhotos.isEmpty {
+                    // Fotoğraf yok — placeholder
                     RoundedRectangle(cornerRadius: 32)
                         .fill(AppTheme.text.opacity(0.05))
                         .frame(width: imageSize, height: imageSize)
@@ -168,9 +173,52 @@ struct ProfilePreviewView: View {
                                 .font(.system(size: 80))
                                 .foregroundStyle(AppTheme.text.opacity(0.2))
                         )
+                } else {
+                    // Swiping carousel
+                    TabView(selection: $currentPhotoIndex) {
+                        ForEach(Array(sortedPhotos.enumerated()), id: \.offset) { idx, photo in
+                            if let uiImage = UIImage(data: photo.data) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: imageSize, height: imageSize)
+                                    .clipped()
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        galleryStartIndex = idx
+                                        showPhotoGallery = true
+                                    }
+                                    .tag(idx)
+                            }
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(width: imageSize, height: imageSize)
+
+                    // Sayfa noktaları
+                    if sortedPhotos.count > 1 {
+                        HStack(spacing: 5) {
+                            ForEach(0..<sortedPhotos.count, id: \.self) { i in
+                                Circle()
+                                    .fill(i == currentPhotoIndex
+                                          ? Color.white
+                                          : Color.white.opacity(0.4))
+                                    .frame(width: i == currentPhotoIndex ? 8 : 6,
+                                           height: i == currentPhotoIndex ? 8 : 6)
+                                    .animation(.spring(response: 0.3), value: currentPhotoIndex)
+                            }
+                        }
+                        .padding(.bottom, 12)
+                    }
                 }
             }
             .frame(width: imageSize, height: imageSize)
+            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 32)
+                    .stroke(AppTheme.text.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         }
         .aspectRatio(1, contentMode: .fit)
     }
@@ -211,7 +259,9 @@ struct ProfilePreviewView: View {
 
     private func infoGrid(profile: Profile) -> some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
-            infoCard(icon: "ruler", value: profile.height, label: "BOY")
+            if profile.showHeight {
+                infoCard(icon: "ruler", value: profile.height, label: "BOY")
+            }
             infoCard(icon: "briefcase", value: profile.jobTitle.isEmpty ? "Belirtilmedi" : profile.jobTitle, label: "MESLEK")
             infoCard(icon: "nosign", value: profile.smokingHabit, label: "SİGARA")
         }
@@ -511,9 +561,84 @@ private struct VIPSendSheet: View {
     }
 }
 
+// MARK: - Photo Gallery (Tam Ekran)
+
+struct PhotoGalleryView: View {
+    let photos: [ProfilePhoto]
+    let startIndex: Int
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var currentIndex: Int
+
+    init(photos: [ProfilePhoto], startIndex: Int) {
+        self.photos = photos
+        self.startIndex = startIndex
+        _currentIndex = State(initialValue: startIndex)
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
+
+            TabView(selection: $currentIndex) {
+                ForEach(Array(photos.enumerated()), id: \.offset) { idx, photo in
+                    if let uiImage = UIImage(data: photo.data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .tag(idx)
+                    }
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .ignoresSafeArea()
+
+            // Üst bar
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(.black.opacity(0.4))
+                        .clipShape(Circle())
+                }
+                Spacer()
+                if photos.count > 1 {
+                    Text("\(currentIndex + 1) / \(photos.count)")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.4))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 60)
+
+            // Alt nokta göstergesi
+            if photos.count > 1 {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 6) {
+                        ForEach(0..<photos.count, id: \.self) { i in
+                            Circle()
+                                .fill(i == currentIndex ? Color.white : Color.white.opacity(0.4))
+                                .frame(width: i == currentIndex ? 8 : 6,
+                                       height: i == currentIndex ? 8 : 6)
+                                .animation(.spring(response: 0.3), value: currentIndex)
+                        }
+                    }
+                    .padding(.bottom, 50)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Helper Views
-
-
 
 #Preview {
     ProfilePreviewView()

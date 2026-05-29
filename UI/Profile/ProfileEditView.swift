@@ -122,6 +122,7 @@ struct ProfileEditView: View {
                                             .foregroundColor(AppTheme.text)
                                         Spacer()
                                         Toggle("", isOn: $showHeight)
+                                            .tint(.green)
                                             .labelsHidden()
                                             .tint(AppTheme.accent)
                                     }
