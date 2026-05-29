@@ -11,12 +11,12 @@ struct RootView: View {
         Group {
             if !session.isAuthed {
                 AuthLandingView()
-            } else if session.currentProfile != nil || session.onboardingSkipped || session.backendOnboardingDone {
-                // Profil tamamlandı, kurulum atlandı veya backend'de onboarding kaydı var
+            } else if session.currentProfile != nil || session.onboardingSkipped {
+                // Lokal profil var ya da kullanıcı kurulumu atladı → ana sayfa
                 MainTabView()
             } else {
-                // Giriş yapıldı ama profil henüz oluşturulmadı → onboarding
-                // Kullanıcı phone OTP veya sosyal giriş ile zaten auth oldu.
+                // Giriş yapıldı ama lokal profil yok → kayıt akışı
+                // (backendOnboardingDone olsa bile; profil olmadan MainTabView kırılır)
                 NavigationStack {
                     SignUpFlowView(
                         isSocialLogin: true,
