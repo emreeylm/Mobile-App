@@ -22,7 +22,7 @@ async def swipe(
     # Kota yalnızca sağ kaydırma (like) için uygulanır — sol kaydırma (dislike) kotadan düşmez
     me = await db.get(Kullanici, user_id)
     if me and me.is_premium:
-        kalan = 999
+        kalan = None  # None = sınırsız swipe hakkı
     elif body.yon == "like":
         izin_var, kalan = await swipe_service.check_and_increment_swipe(redis, str(user_id))
         if not izin_var:

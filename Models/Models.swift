@@ -46,7 +46,6 @@ final class Profile {
     var showHeight: Bool = true
     var smokingHabit: String = "Söylemek istemiyorum"
     var alcoholHabit: String = "Söylemek istemiyorum"
-    var university: String = ""
     var interests: [String] = []
     var nowWatching: String = ""
 
@@ -75,7 +74,6 @@ final class Profile {
         height: String = "170 cm",
         smokingHabit: String = "Söylemek istemiyorum",
         alcoholHabit: String = "Söylemek istemiyorum",
-        university: String = "",
         interests: [String] = [],
         nowWatching: String = "",
         remotePhotoURL: String? = nil
@@ -95,7 +93,6 @@ final class Profile {
         self.height = height
         self.smokingHabit = smokingHabit
         self.alcoholHabit = alcoholHabit
-        self.university = university
         self.interests = interests
         self.nowWatching = nowWatching
         self.remotePhotoURL = remotePhotoURL

@@ -20,6 +20,21 @@ _LOCAL_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 _MAX_PHOTO_BYTES = 8 * 1024 * 1024  # 8 MB
 _ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}
 
+# Magic byte → MIME doğrulama (fake extension saldırılarını engeller)
+_IMAGE_MAGIC: dict[bytes, str] = {
+    b"\xff\xd8\xff": "image/jpeg",
+    b"\x89PNG\r\n\x1a\n": "image/png",
+    b"RIFF": "image/webp",
+}
+
+def _detect_image_magic(data: bytes) -> str | None:
+    for magic, mime in _IMAGE_MAGIC.items():
+        if data.startswith(magic):
+            if mime == "image/webp" and b"WEBP" not in data[:16]:
+                continue
+            return mime
+    return None
+
 
 async def _get_or_404(db: AsyncSession, user_id: uuid.UUID) -> Kullanici:
     result = await db.execute(select(Kullanici).where(Kullanici.id == user_id))
@@ -110,6 +125,13 @@ async def upload_photo(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="Dosya boyutu 8 MB limitini aşıyor",
+        )
+
+    detected = _detect_image_magic(data)
+    if detected is None or detected != content_type:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Geçersiz veya hatalı görüntü dosyası. Gerçek bir JPEG/PNG/WebP yükleyin.",
         )
 
     filename = storage_service.make_filename(str(user_id), data, content_type)

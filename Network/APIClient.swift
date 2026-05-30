@@ -199,6 +199,14 @@ extension APIClient {
                           requiresAuth: false)
     }
 
+    /// Refresh token'ı backend blacklist'ine ekler. Best-effort; hata yutulur.
+    func logout() async throws {
+        guard let refreshToken = keychain.load(for: KeychainManager.refreshTokenKey) else { return }
+        try await requestEmpty("POST", path: "/api/v1/auth/logout",
+                               body: RefreshRequest(refresh_token: refreshToken),
+                               requiresAuth: false)
+    }
+
     // User
     func getMe() async throws -> UserResponse {
         try await request("GET", path: "/api/v1/users/me")

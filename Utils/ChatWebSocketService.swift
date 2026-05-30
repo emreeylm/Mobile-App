@@ -96,14 +96,18 @@ final class ChatWebSocketService: NSObject, ObservableObject, URLSessionWebSocke
         )
 
         let wsBase = APIClient.shared.webSocketBaseURL
-        guard let url = URL(string: "\(wsBase)/ws/chat/\(otherBackendUserId)?token=\(token)") else {
+        guard let url = URL(string: "\(wsBase)/ws/chat/\(otherBackendUserId)") else {
             logger.error("Geçersiz WS URL")
             return
         }
 
+        // Token, URL query'de değil Sec-WebSocket-Protocol header'ında taşınır (log sızıntısını önler)
+        var request = URLRequest(url: url)
+        request.setValue("bearer.\(token)", forHTTPHeaderField: "Sec-WebSocket-Protocol")
+
         connectionState = .connecting
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
-        let t = session.webSocketTask(with: url)
+        let t = session.webSocketTask(with: request)
         task = t
         t.resume()
         reconnectAttempt = 0  // Başarılı bağlantıda sayacı sıfırla

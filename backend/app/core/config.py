@@ -44,8 +44,16 @@ class Settings(BaseSettings):
     # CDN / public URL prefix (boş bırakılırsa S3 URL kullanılır)
     S3_BASE_URL: str = ""
 
-    # CORS — üretimde kısıtlayın: ["https://yourdomain.com"]
-    ALLOWED_ORIGINS: list[str] = ["*"]
+    # CORS — üretimde Render env'e virgülle ayrılmış origin listesi girin
+    # Örnek: ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+    # Boş bırakılırsa sadece local-dev originlerine izin verilir.
+    ALLOWED_ORIGINS: str = ""
+
+    @property
+    def cors_origins(self) -> list[str]:
+        if not self.ALLOWED_ORIGINS:
+            return ["http://localhost:3000", "capacitor://localhost", "ionic://localhost"]
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
 
     @model_validator(mode="after")
     def _security_checks(self):

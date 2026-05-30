@@ -1,7 +1,7 @@
 """POST /reports/block, POST /reports/report, GET /admin/reports — Engelleme ve şikayet"""
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,8 +82,8 @@ async def _require_admin(
 
 @router.get("/admin", response_model=list[RaporResponse], tags=["admin"])
 async def list_reports(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     sebep: str | None = None,
     admin_id: uuid.UUID = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),

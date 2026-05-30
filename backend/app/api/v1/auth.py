@@ -2,9 +2,11 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import create_access_token, create_refresh_token, decode_token
+from app.core.dependencies import get_redis
 from app.db.session import get_db
 from app.db.models import Kullanici
 from app.schemas.auth import (
@@ -58,28 +60,65 @@ async def social_login(
             await db.flush()
 
     user_id = str(kullanici.id)
+    refresh_tok, _ = create_refresh_token(user_id)
     return TokenResponse(
         access_token=create_access_token(user_id),
-        refresh_token=create_refresh_token(user_id),
+        refresh_token=refresh_tok,
         is_new_user=is_new,
     )
 
 
-# MARK: - Token Refresh
+# MARK: - Token Refresh (with rotation)
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(body: RefreshRequest):
-    """Refresh token ile yeni access token üretir."""
+async def refresh_token(
+    body: RefreshRequest,
+    redis: Redis = Depends(get_redis),
+):
+    """
+    Refresh token ile yeni access + refresh token üretir (rotation).
+    Eski refresh token Redis blacklist'e eklenir.
+    """
     try:
         payload = decode_token(body.refresh_token)
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = payload["sub"]
+        old_jti = payload.get("jti")
     except (JWTError, KeyError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
+    # Eski jti revoke edilmiş mi?
+    if old_jti and await redis.exists(f"jti:revoked:{old_jti}"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
+
+    # Eski token'ı blacklist'e ekle (rotation — jti yoksa eski client, rotation atla)
+    if old_jti:
+        await redis.setex(f"jti:revoked:{old_jti}", 30 * 24 * 3600, "1")
+
+    new_refresh, _ = create_refresh_token(user_id)
     return TokenResponse(
         access_token=create_access_token(user_id),
-        refresh_token=create_refresh_token(user_id),
+        refresh_token=new_refresh,
         is_new_user=False,
     )
+
+
+# MARK: - Logout
+
+@router.post("/logout", status_code=204)
+async def logout(
+    body: RefreshRequest,
+    redis: Redis = Depends(get_redis),
+):
+    """
+    Refresh token'ı blacklist'e ekler.
+    Access token TTL'i (15 dk) kısa olduğu için ayrıca blacklist'e girmez.
+    """
+    try:
+        payload = decode_token(body.refresh_token)
+        jti = payload.get("jti")
+        if jti:
+            await redis.setex(f"jti:revoked:{jti}", 30 * 24 * 3600, "1")
+    except JWTError:
+        pass  # geçersiz token zaten kullanılamaz

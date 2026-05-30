@@ -14,14 +14,14 @@ router = APIRouter(prefix="/discover", tags=["discover"])
 
 @router.get("", response_model=DiscoverResponse)
 async def discover(
-    lat: float = Query(...),
-    lon: float = Query(...),
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
     global_mod: bool = Query(False),
-    min_age: int | None = Query(None),
-    max_age: int | None = Query(None),
-    max_distance_km: int | None = Query(None),
-    min_boy: int | None = Query(None),   # Premium: min boy filtresi (cm)
-    max_boy: int | None = Query(None),   # Premium: max boy filtresi (cm)
+    min_age: int | None = Query(None, ge=18, le=99),
+    max_age: int | None = Query(None, ge=18, le=99),
+    max_distance_km: int | None = Query(None, ge=1, le=20000),
+    min_boy: int | None = Query(None, ge=100, le=250),
+    max_boy: int | None = Query(None, ge=100, le=250),
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
@@ -59,9 +59,11 @@ async def discover(
 
 
 async def _get_boosted_ids(redis: Redis, user_ids: list[str]) -> set[str]:
-    """Redis'te boost key'i olan kullanıcı ID'lerini döner."""
-    boosted: set[str] = set()
+    """Redis pipeline ile boost key'i olan kullanıcı ID'lerini döner (tek roundtrip)."""
+    if not user_ids:
+        return set()
+    pipe = redis.pipeline()
     for uid in user_ids:
-        if await redis.exists(f"user:boost:{uid}"):
-            boosted.add(uid)
-    return boosted
+        pipe.exists(f"user:boost:{uid}")
+    results = await pipe.execute()
+    return {uid for uid, exists in zip(user_ids, results) if exists}

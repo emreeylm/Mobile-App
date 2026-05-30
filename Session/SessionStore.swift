@@ -107,6 +107,10 @@ final class SessionStore: ObservableObject {
     }
 
     func signOut() {
+        // Best-effort: refresh token'ı backend'de blacklist'e ekle
+        Task {
+            _ = try? await api.logout()
+        }
         keychain.clearAll()
         isAuthed = false
         currentUserId = nil

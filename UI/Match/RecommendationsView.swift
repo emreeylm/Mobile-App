@@ -83,7 +83,11 @@ struct RecommendationsView: View {
                         ProgressView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        if deck.isEmpty {
+                        if deck.isEmpty && isFetchingBackend {
+                            loadingState
+                                .frame(width: cardW, height: cardH)
+                                .padding(.top, topInset)
+                        } else if deck.isEmpty {
                             emptyState
                                 .frame(width: cardW, height: cardH)
                                 .padding(.top, topInset)
@@ -215,6 +219,7 @@ struct RecommendationsView: View {
                 
             Button {
                 buildDeck(force: true)
+                Task { await fetchBackendProfiles() }
             } label: {
                 Text("Yenile")
                     .font(.subheadline.weight(.semibold))
@@ -233,6 +238,22 @@ struct RecommendationsView: View {
             RoundedRectangle(cornerRadius: 22)
                 .stroke(AppTheme.text.opacity(0.1), lineWidth: 1)
         )
+        .padding(.horizontal, 16)
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.4)
+                .tint(AppTheme.accent)
+            Text("Profiller yükleniyor…")
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.text.opacity(0.5))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(AppTheme.text.opacity(0.1), lineWidth: 1))
         .padding(.horizontal, 16)
     }
 

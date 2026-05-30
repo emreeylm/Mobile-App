@@ -1,4 +1,5 @@
 """Chat: WS /ws/chat/{other_user_id} + GET /chat/{other_user_id}/messages"""
+import asyncio
 import json
 import logging
 import uuid
@@ -18,6 +19,7 @@ router = APIRouter(tags=["chat"])
 
 # Aktif WebSocket bağlantıları: oda_id → [(user_id_str, WebSocket)]
 _connections: dict[str, list[tuple[str, WebSocket]]] = {}
+_connections_lock = asyncio.Lock()
 
 
 def _canonical_room(a: str, b: str) -> str:
@@ -59,12 +61,11 @@ async def _assert_matched(db: AsyncSession, user_id: uuid.UUID, other_id: uuid.U
 async def chat_ws(
     other_user_id: uuid.UUID,
     websocket: WebSocket,
-    token: str = Query(...),
     redis: Redis = Depends(get_redis),
 ):
     """
-    JWT access token'ı `token` query parametresi olarak bekler.
-    Örnek: ws://host/ws/chat/{other_user_id}?token=<jwt>
+    JWT access token'ı Sec-WebSocket-Protocol header'ında "bearer.<jwt>" formatında bekler.
+    Geriye dönük uyumluluk için `token` query parametresi de kabul edilir.
 
     Mesaj formatı (gönderme): JSON {"text": "..."} veya düz metin.
     Mesaj formatı (alma):
@@ -73,6 +74,24 @@ async def chat_ws(
     """
     from app.core.security import decode_token
     from jose import JWTError
+
+    # Token: önce Sec-WebSocket-Protocol header'ı, yoksa query param (eski client uyumu)
+    protocols = websocket.headers.get("sec-websocket-protocol", "")
+    token = None
+    selected_protocol = None
+    for p in protocols.split(","):
+        p = p.strip()
+        if p.startswith("bearer."):
+            token = p[len("bearer."):]
+            selected_protocol = p
+            break
+
+    if not token:
+        token = websocket.query_params.get("token")
+
+    if not token:
+        await websocket.close(code=4001)
+        return
 
     # Token doğrulama
     try:
@@ -95,8 +114,10 @@ async def chat_ws(
         return
 
     room = _canonical_room(str(user_id), str(other_user_id))
-    await websocket.accept()
-    _connections.setdefault(room, []).append((str(user_id), websocket))
+    await websocket.accept(subprotocol=selected_protocol)
+
+    async with _connections_lock:
+        _connections.setdefault(room, []).append((str(user_id), websocket))
 
     try:
         # Geçmiş mesajları gönder (son 50, kronolojik sıra)
@@ -160,20 +181,26 @@ async def chat_ws(
             }
 
             # Odadaki tüm bağlı istemcilere ilet
+            async with _connections_lock:
+                current_conns = list(_connections.get(room, []))
+
             dead: list[tuple[str, WebSocket]] = []
             other_is_online = False
-            for uid, ws in list(_connections.get(room, [])):
+            for uid, ws in current_conns:
                 try:
                     await ws.send_json(payload_out)
                     if uid == str(other_user_id):
                         other_is_online = True
                 except Exception:
                     dead.append((uid, ws))
-            for item in dead:
-                try:
-                    _connections[room].remove(item)
-                except ValueError:
-                    pass
+
+            if dead:
+                async with _connections_lock:
+                    for item in dead:
+                        try:
+                            _connections[room].remove(item)
+                        except ValueError:
+                            pass
 
             # Karşı taraf çevrimdışıysa push bildirimi gönder
             if not other_is_online:
@@ -185,8 +212,11 @@ async def chat_ws(
     except WebSocketDisconnect:
         pass
     finally:
-        conns = _connections.get(room, [])
-        _connections[room] = [(uid, ws) for uid, ws in conns if ws is not websocket]
+        async with _connections_lock:
+            conns = _connections.get(room, [])
+            _connections[room] = [(uid, ws) for uid, ws in conns if ws is not websocket]
+            if not _connections.get(room):
+                _connections.pop(room, None)
 
 
 @router.get("/chat/{other_user_id}/messages")

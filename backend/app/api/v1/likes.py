@@ -50,7 +50,7 @@ async def get_likes(
         else:
             entry["isim"] = None
             entry["now_watching"] = None
-            entry["durum"] = eslesme.durum
+            entry["durum"] = "like"   # VIP bilet bilgisini non-premium'dan gizle
             entry["mesaj"] = None
         data.append(entry)
 

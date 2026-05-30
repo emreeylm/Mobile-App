@@ -11,9 +11,10 @@ class Kullanici(Base):
     __tablename__ = "tbl_kullanicilar"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)   # nullable: telefon auth'da yok
-    telefon: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)  # E.164: +905xxxxxxxxx
-    auth_provider: Mapped[str] = mapped_column(String(50), nullable=False)               # 'apple' | 'google' | 'phone'
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    # DEPRECATED (2026-05): telefon OTP auth kaldırıldı. Kolon backward compat için tutuluyor.
+    telefon: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
+    auth_provider: Mapped[str] = mapped_column(String(50), nullable=False)  # 'apple' | 'google'
     provider_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     isim: Mapped[str] = mapped_column(String(100), nullable=False)
     yas: Mapped[int] = mapped_column(Integer, nullable=False)
