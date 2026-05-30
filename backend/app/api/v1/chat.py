@@ -138,6 +138,7 @@ async def chat_ws(
                     "from": str(msg.gonderen_id),
                     "text": msg.metin,
                     "tarih": msg.tarih.isoformat(),
+                    "okundu": msg.okundu,
                 })
             except Exception:
                 break
@@ -164,6 +165,46 @@ async def chat_ws(
                             await ws.send_json({"type": "typing", "from": str(user_id)})
                         except Exception:
                             pass
+                continue
+
+            # Okundu bildirimi (Premium özelliği — iOS client gönderiri kontrol eder)
+            if msg_type == "read":
+                last_id = parsed.get("last_id") if isinstance(parsed, dict) else None
+                if isinstance(last_id, int):
+                    try:
+                        async with AsyncSessionLocal() as db:
+                            await db.execute(
+                                select(ChatMesaj)
+                                .where(
+                                    ChatMesaj.oda_id == room,
+                                    ChatMesaj.id <= last_id,
+                                    ChatMesaj.gonderen_id != user_id,
+                                    ChatMesaj.okundu == False,  # noqa: E712
+                                )
+                            )
+                            from sqlalchemy import update as sa_update
+                            await db.execute(
+                                sa_update(ChatMesaj)
+                                .where(
+                                    ChatMesaj.oda_id == room,
+                                    ChatMesaj.id <= last_id,
+                                    ChatMesaj.gonderen_id != user_id,
+                                )
+                                .values(okundu=True)
+                            )
+                            await db.commit()
+                    except Exception as exc:
+                        logger.error(f"Okundu güncelleme hatası: {exc}")
+
+                    # Karşı tarafa okundu bildir
+                    async with _connections_lock:
+                        current_conns = list(_connections.get(room, []))
+                    for uid, ws in current_conns:
+                        if uid != str(user_id):
+                            try:
+                                await ws.send_json({"type": "read", "last_id": last_id})
+                            except Exception:
+                                pass
                 continue
 
             if not text:
@@ -193,6 +234,7 @@ async def chat_ws(
                 "from": str(user_id),
                 "text": text,
                 "tarih": tarih_now.isoformat(),
+                "okundu": False,
             }
 
             # Odadaki tüm bağlı istemcilere ilet

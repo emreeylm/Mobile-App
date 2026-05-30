@@ -6,6 +6,7 @@ struct ChatView: View {
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var session: SessionStore
+    @EnvironmentObject var subscriptionStore: AppSubscriptionStore
 
     @State private var thread: ChatThread?
     let otherProfile: Profile
@@ -54,11 +55,17 @@ struct ChatView: View {
                         .padding(.vertical, 20)
                     }
                     .scrollIndicators(.hidden)
-                    .onChange(of: messagesForThread.count) { _, _ in scrollLast(proxy) }
+                    .onChange(of: messagesForThread.count) { _, _ in
+                        scrollLast(proxy)
+                        markPartnerMessagesRead()
+                    }
                     .onChange(of: wsService.partnerIsTyping) { _, isTyping in
                         if isTyping { scrollTo(proxy, id: "typing") }
                     }
-                    .onAppear { scrollLast(proxy) }
+                    .onAppear {
+                        scrollLast(proxy)
+                        markPartnerMessagesRead()
+                    }
                 }
 
                 composerArea
@@ -301,11 +308,7 @@ struct ChatView: View {
                         .foregroundStyle(AppTheme.text.opacity(0.4))
 
                     if isMe {
-                        Image(systemName: msg.remoteIdStr.isEmpty ? "clock" : "checkmark.seal.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(msg.remoteIdStr.isEmpty
-                                ? AppTheme.text.opacity(0.3)
-                                : AppTheme.accent)
+                        readStatusIcon(for: msg)
                     }
                 }
                 .padding(.horizontal, 4)
@@ -332,6 +335,33 @@ struct ChatView: View {
 
     private func scrollTo(_ proxy: ScrollViewProxy, id: String) {
         withAnimation { proxy.scrollTo(id, anchor: .bottom) }
+    }
+
+    @ViewBuilder
+    private func readStatusIcon(for msg: ChatMessage) -> some View {
+        let remoteId = Int(msg.remoteIdStr) ?? 0
+        let isRead = subscriptionStore.isPremium && remoteId > 0 && remoteId <= wsService.lastReadByPartner
+
+        if msg.remoteIdStr.isEmpty {
+            Image(systemName: "clock")
+                .font(.system(size: 10))
+                .foregroundStyle(AppTheme.text.opacity(0.3))
+        } else if isRead {
+            Image(systemName: "checkmark.bubble.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(AppTheme.accent)
+        } else {
+            Image(systemName: "checkmark")
+                .font(.system(size: 10))
+                .foregroundStyle(AppTheme.text.opacity(0.4))
+        }
+    }
+
+    private func markPartnerMessagesRead() {
+        guard let myId = session.currentProfile?.id else { return }
+        let partnerMessages = messagesForThread.filter { $0.senderProfileId != myId }
+        guard let lastRemoteId = partnerMessages.compactMap({ Int($0.remoteIdStr) }).max() else { return }
+        wsService.sendRead(lastId: lastRemoteId)
     }
 
     private var typingBubble: some View {
