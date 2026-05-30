@@ -18,6 +18,7 @@ struct ProfilePreviewView: View {
     @State private var vipSent = false
     @State private var vipError = false
     @State private var showPaywall = false
+    @State private var actionErrorMessage: String? = nil
 
     // Fotoğraf galerisi
     @State private var currentPhotoIndex = 0
@@ -103,6 +104,14 @@ struct ProfilePreviewView: View {
         } message: {
             Text("VIP bilet gönderilemedi. Bilet bakiyeni kontrol et.")
         }
+        .alert("Hata", isPresented: Binding(
+            get: { actionErrorMessage != nil },
+            set: { if !$0 { actionErrorMessage = nil } }
+        )) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text(actionErrorMessage ?? "")
+        }
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView()
         }
@@ -122,8 +131,29 @@ struct ProfilePreviewView: View {
                         .clipShape(Circle())
                 }
             }
-            
+
             Spacer()
+
+            if !isMe {
+                Menu {
+                    Button(role: .destructive) { blockAction() } label: {
+                        Label("Engelle", systemImage: "hand.raised.fill")
+                    }
+                    Menu("Raporla") {
+                        Button("Spam") { reportAction(reason: "spam") }
+                        Button("Uygunsuz İçerik") { reportAction(reason: "uygunsuz_icerik") }
+                        Button("Taciz") { reportAction(reason: "taciz") }
+                        Button("Sahte Profil") { reportAction(reason: "sahte_profil") }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 20))
+                        .rotationEffect(.degrees(90))
+                        .foregroundStyle(AppTheme.text.opacity(0.6))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+            }
 
             if isMe {
                 HStack(spacing: 10) {
@@ -451,6 +481,31 @@ struct ProfilePreviewView: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+        }
+    }
+
+    private func blockAction() {
+        guard let p = displayProfile else { return }
+        let targetId = p.ownerUserId
+        Task {
+            do {
+                try await APIClient.shared.blockUser(targetId: targetId)
+            } catch {
+                actionErrorMessage = "Engelleme başarısız: \(error.localizedDescription)"
+            }
+        }
+        dismiss()
+    }
+
+    private func reportAction(reason: String) {
+        guard let p = displayProfile else { return }
+        let targetId = p.ownerUserId
+        Task {
+            do {
+                try await APIClient.shared.reportUser(targetId: targetId, reason: reason)
+            } catch {
+                actionErrorMessage = "Raporlama gönderilemedi: \(error.localizedDescription)"
             }
         }
     }

@@ -24,8 +24,10 @@ final class ChatWebSocketService: NSObject, ObservableObject, URLSessionWebSocke
     }
 
     @Published var connectionState: ConnectionState = .disconnected
+    @Published var partnerIsTyping: Bool = false
 
     private var task: URLSessionWebSocketTask?
+    private var typingResetTask: Task<Void, Never>?
 
     // Backend UUID (WS endpoint'inde kullanılır)
     private let otherBackendUserId: String
@@ -125,6 +127,13 @@ final class ChatWebSocketService: NSObject, ObservableObject, URLSessionWebSocke
 
     // MARK: - Gönderme
 
+    func sendTyping() {
+        guard connectionState == .connected, let t = task else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: ["type": "typing"]),
+              let payload = String(data: data, encoding: .utf8) else { return }
+        t.send(.string(payload)) { _ in }
+    }
+
     func sendText(_ text: String) {
         guard connectionState == .connected, let t = task else { return }
         guard let data = try? JSONSerialization.data(withJSONObject: ["text": text]),
@@ -173,6 +182,17 @@ final class ChatWebSocketService: NSObject, ObservableObject, URLSessionWebSocke
         let text     = json["text"]  as? String ?? ""
         let remoteId = json["id"]    as? Int
         let tarihStr = json["tarih"] as? String ?? ""
+
+        // Typing indicator — geçici UI state, DB'ye kaydedilmez
+        if msgType == "typing" && fromId != myBackendUserId {
+            partnerIsTyping = true
+            typingResetTask?.cancel()
+            typingResetTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                self?.partnerIsTyping = false
+            }
+            return
+        }
 
         guard !text.isEmpty, let rid = remoteId else { return }
 

@@ -1,6 +1,10 @@
 """GET/PATCH /users/me + POST /users/me/photos"""
-import uuid
+import asyncio
+import logging
 import os
+import tempfile
+import uuid
+from functools import lru_cache
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse
@@ -12,6 +16,8 @@ from app.core.config import settings
 from app.db.models import Kullanici
 from app.schemas.user import KullaniciGuncelle, KullaniciResponse
 from app.services import storage_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -34,6 +40,51 @@ def _detect_image_magic(data: bytes) -> str | None:
                 continue
             return mime
     return None
+
+
+# NSFW tespiti — nudenet ONNX modeli ilk kullanımda indirilir (~50 MB)
+_NSFW_LABELS = {
+    "FEMALE_GENITALIA_EXPOSED",
+    "MALE_GENITALIA_EXPOSED",
+    "FEMALE_BREAST_EXPOSED",
+    "BUTTOCKS_EXPOSED",
+    "ANUS_EXPOSED",
+}
+
+@lru_cache(maxsize=1)
+def _get_nude_detector():
+    try:
+        from nudenet import NudeDetector
+        return NudeDetector()
+    except Exception as exc:
+        logger.warning("NudeDetector başlatılamadı — NSFW kontrolü devre dışı: %s", exc)
+        return None
+
+
+async def _is_nsfw(data: bytes) -> bool:
+    detector = _get_nude_detector()
+    if detector is None:
+        return False
+
+    def _check() -> bool:
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                tmp.write(data)
+                tmp_path = tmp.name
+            try:
+                results = detector.detect(tmp_path)
+                return any(
+                    r.get("class") in _NSFW_LABELS and r.get("score", 0) >= 0.6
+                    for r in results
+                )
+            finally:
+                os.unlink(tmp_path)
+        except Exception as exc:
+            logger.warning("NSFW kontrol hatası: %s", exc)
+            return False
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _check)
 
 
 async def _get_or_404(db: AsyncSession, user_id: uuid.UUID) -> Kullanici:
@@ -132,6 +183,12 @@ async def upload_photo(
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Geçersiz veya hatalı görüntü dosyası. Gerçek bir JPEG/PNG/WebP yükleyin.",
+        )
+
+    if await _is_nsfw(data):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Uygunsuz içerik tespit edildi. Lütfen farklı bir fotoğraf yükleyin.",
         )
 
     filename = storage_service.make_filename(str(user_id), data, content_type)

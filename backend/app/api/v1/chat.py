@@ -147,9 +147,24 @@ async def chat_ws(
 
             # Metin ayrıştırma
             try:
-                text = str(json.loads(raw).get("text", "")).strip()
+                parsed = json.loads(raw)
+                msg_type = parsed.get("type", "message")
+                text = str(parsed.get("text", "")).strip()
             except (json.JSONDecodeError, AttributeError):
+                msg_type = "message"
                 text = raw.strip()
+
+            # Typing indicator — DB'ye kaydetmeden diğer tarafa ilet
+            if msg_type == "typing":
+                async with _connections_lock:
+                    current_conns = list(_connections.get(room, []))
+                for uid, ws in current_conns:
+                    if uid != str(user_id):
+                        try:
+                            await ws.send_json({"type": "typing", "from": str(user_id)})
+                        except Exception:
+                            pass
+                continue
 
             if not text:
                 continue

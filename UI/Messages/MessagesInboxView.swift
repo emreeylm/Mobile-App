@@ -34,6 +34,7 @@ struct MessagesInboxView: View {
                         .padding(.bottom, 24)
                     }
                     .scrollIndicators(.hidden)
+                    .refreshable { await fetchBackendMatches() }
                 }
             }
             .toolbar(.hidden, for: .navigationBar)

@@ -44,12 +44,20 @@ struct ChatView: View {
                                 bubble(msg)
                                     .id(msg.id)
                             }
+
+                            if wsService.partnerIsTyping {
+                                typingBubble
+                                    .id("typing")
+                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 20)
                     }
                     .scrollIndicators(.hidden)
                     .onChange(of: messagesForThread.count) { _, _ in scrollLast(proxy) }
+                    .onChange(of: wsService.partnerIsTyping) { _, isTyping in
+                        if isTyping { scrollTo(proxy, id: "typing") }
+                    }
                     .onAppear { scrollLast(proxy) }
                 }
 
@@ -221,6 +229,9 @@ struct ChatView: View {
                     .foregroundColor(AppTheme.text)
                     .padding(.vertical, 10)
                     .padding(.leading, 16)
+                    .onChange(of: text) { _, newValue in
+                        if !newValue.isEmpty { wsService.sendTyping() }
+                    }
                 }
                 .background(AppTheme.text.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -317,6 +328,35 @@ struct ChatView: View {
         if let last = messagesForThread.last {
             withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
         }
+    }
+
+    private func scrollTo(_ proxy: ScrollViewProxy, id: String) {
+        withAnimation { proxy.scrollTo(id, anchor: .bottom) }
+    }
+
+    private var typingBubble: some View {
+        HStack {
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(AppTheme.text.opacity(0.4))
+                        .frame(width: 7, height: 7)
+                        .offset(y: -3)
+                        .animation(
+                            .easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.15),
+                            value: wsService.partnerIsTyping
+                        )
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(AppTheme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(ChatBubbleShape(isMe: false))
+
+            Spacer(minLength: 60)
+        }
+        .transition(.scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity))
     }
 
     private func timeText(_ date: Date) -> String {
